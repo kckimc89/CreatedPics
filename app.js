@@ -20,8 +20,32 @@ for(const id of ['scale','rotate','shadow','frameSize'])$(id).addEventListener('
 $('resetPosition').onclick=()=>{work.x=450;work.y=480;render();};$('artText').oninput=e=>{work.caption=e.target.value;render();};$('artName').oninput=e=>work.name=e.target.value;
 function loadImg(url){return new Promise((ok,no)=>{const im=new Image;im.onload=()=>ok(im);im.onerror=no;im.src=url;});}
 function setupPhoto(img){const max=1400, s=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));const iw=Math.round((img.naturalWidth||img.width)*s),ih=Math.round((img.naturalHeight||img.height)*s);const c=document.createElement('canvas');c.width=iw;c.height=ih;c.getContext('2d').drawImage(img,0,0,iw,ih);const data=c.toDataURL('image/png');return {data,iw,ih};}
-async function importPhoto(file){if(!file)return;if(!file.type.startsWith('image/')){toast('사진 파일을 선택해 주세요.');return;}try{const src=URL.createObjectURL(file);const img=await loadImg(src);const setup=setupPhoto(img);URL.revokeObjectURL(src);work.subject=setup.data;image=await loadImg(work.subject);initMask(setup.iw,setup.ih);work.x=450;work.y=480;work.scale=Math.min(125,Math.round(650/Math.max(setup.iw,setup.ih)*100));syncControls();render();toast('사진을 불러왔어요. 누끼 탭에서 배경을 지울 수 있습니다.');}catch(e){toast('이 사진은 불러올 수 없습니다. JPEG 또는 PNG로 시도해 주세요.');console.error(e);}}
-$('photoFile').onchange=e=>{importPhoto(e.target.files?.[0]);e.target.value='';};
+function photoStatus(message){const el=$('photoStatus');if(el)el.textContent=message;}
+async function importPhoto(file){
+  if(!file){photoStatus('사진을 선택하지 않았습니다. 다시 선택해 주세요.');return;}
+  const isImage=(file.type||'').startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||'');
+  if(!isImage){photoStatus('사진 파일이 아닙니다. 사진 보관함에서 JPEG 또는 PNG 사진을 선택해 주세요.');return;}
+  photoStatus('사진을 읽고 있습니다…');
+  let src;
+  try{
+    src=URL.createObjectURL(file);
+    const img=await loadImg(src);
+    const setup=setupPhoto(img);
+    work.subject=setup.data;
+    image=await loadImg(work.subject);
+    initMask(setup.iw,setup.ih);
+    work.x=450;work.y=480;
+    work.scale=Math.min(125,Math.round(650/Math.max(setup.iw,setup.ih)*100));
+    syncControls();render();
+    photoStatus('✅ 사진을 불러왔습니다: '+(file.name||'선택한 사진'));
+    toast('사진을 불러왔어요. 이제 배경을 바꾸거나 누끼를 편집해 보세요.');
+  }catch(e){
+    photoStatus('⚠️ 선택한 사진을 읽을 수 없습니다. 사진 앱에서 사진을 공유 → 이미지 저장 또는 파일에 저장 후 JPEG/PNG로 다시 시도해 주세요.');
+    toast('사진 읽기에 실패했습니다. 사진 형식을 확인해 주세요.');
+    console.error('사진 가져오기 오류:',e);
+  }finally{if(src)URL.revokeObjectURL(src);}
+}
+$('photoFile').addEventListener('change',e=>{const file=e.currentTarget.files&&e.currentTarget.files[0];importPhoto(file);e.currentTarget.value='';});
 function initMask(w,h){maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;maskCtx=maskCanvas.getContext('2d',{willReadFrequently:true});maskCtx.fillStyle='#fff';maskCtx.fillRect(0,0,w,h);maskHistory=[];}
 function saveMaskUndo(){if(!maskCanvas)return;maskHistory.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));if(maskHistory.length>8)maskHistory.shift();}
 function doBrush(px,py){if(!image||!maskCanvas)return;const p=toLocalImage(px,py);if(!p)return;maskCtx.save();maskCtx.globalCompositeOperation=activeBrush==='erase'?'destination-out':'source-over';maskCtx.fillStyle='#fff';maskCtx.beginPath();maskCtx.arc(p.x,p.y,brushSize/(work.scale/100)/2,0,2*Math.PI);maskCtx.fill();maskCtx.restore();render();}
