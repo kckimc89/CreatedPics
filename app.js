@@ -16,36 +16,67 @@ for(const icon of decorations){const b=document.createElement('button');b.textCo
 function syncControls(){for(const b of document.querySelectorAll('#backgrounds .choice'))b.classList.toggle('selected',b.dataset.value===work.background);for(const b of document.querySelectorAll('#frames .choice'))b.classList.toggle('selected',b.dataset.value===work.frame);for(const [name,val,suffix] of [['scale',work.scale,'%'],['rotate',work.rotation,'°'],['shadow',work.shadow,'%'],['frameSize',work.frameSize,'%']]){$(name).value=val;$(name+'Value').textContent=val+suffix;}$('artText').value=work.caption||'';$('artName').value=work.name||'';$('popSettings').style.display=work.mode==='pop'?'block':'none';$('modeLabel').textContent=work.mode==='magic'?'마법 합성사진':'입체사진';}
 function begin(m){work=defaultWork();work.mode=m;work.background=m==='pop'?'plain':'flowers';image=null;originalCanvas=null;maskCanvas=null;maskHistory=[];currentId=null;selectedSticker=-1;syncControls();showTab('setting');screen('editor');render();}
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>begin(b.dataset.mode));$('homeBtn').onclick=()=>screen('home');$('backToHome').onclick=()=>screen('home');$('galleryHome').onclick=()=>screen('home');$('backupHome').onclick=()=>screen('home');$('galleryOpen').onclick=()=>openGallery();$('backupOpen').onclick=()=>screen('backup');document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
-for(const id of ['scale','rotate','shadow','frameSize'])$(id).addEventListener('input',e=>{work[id]=+e.target.value;syncRange(id);render();});function syncRange(id){const s=id==='rotate'?'°':'%';$(id+'Value').textContent=work[id]+s;}
+for(const id of ['scale','rotate','shadow','frameSize'])$(id).addEventListener('input',e=>{work[id==='rotate'?'rotation':id]=+e.target.value;syncRange(id);render();});function syncRange(id){const s=id==='rotate'?'°':'%';$(id+'Value').textContent=work[id==='rotate'?'rotation':id]+s;}
 $('resetPosition').onclick=()=>{work.x=450;work.y=480;render();};$('artText').oninput=e=>{work.caption=e.target.value;render();};$('artName').oninput=e=>work.name=e.target.value;
-function loadImg(url){return new Promise((ok,no)=>{const im=new Image;im.onload=()=>ok(im);im.onerror=no;im.src=url;});}
-function setupPhoto(img){const max=1400, s=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));const iw=Math.round((img.naturalWidth||img.width)*s),ih=Math.round((img.naturalHeight||img.height)*s);const c=document.createElement('canvas');c.width=iw;c.height=ih;c.getContext('2d').drawImage(img,0,0,iw,ih);const data=c.toDataURL('image/png');return {data,iw,ih};}
+function loadImg(url){return new Promise((ok,no)=>{const im=new Image;im.onload=()=>ok(im);im.onerror=()=>no(new Error('이미지 디코딩에 실패했습니다'));im.src=url;});}
+// The iPad Photos picker may return a large JPEG, HEIF or an iCloud-backed file.
+// Decode first, then make one bounded working copy. Never mutate the original.
+function setupPhoto(img){
+  const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height;
+  if(!sw||!sh)throw new Error('사진 크기를 확인할 수 없습니다');
+  const max=1000,ratio=Math.min(1,max/Math.max(sw,sh));
+  const iw=Math.max(1,Math.round(sw*ratio)),ih=Math.max(1,Math.round(sh*ratio));
+  const c=document.createElement('canvas');c.width=iw;c.height=ih;
+  const ctx=c.getContext('2d');if(!ctx)throw new Error('사진 작업 공간을 만들 수 없습니다');
+  ctx.drawImage(img,0,0,iw,ih);
+  // PNG is required for subject transparency; convert the bounded copy only.
+  const data=c.toDataURL('image/png');
+  if(!data.startsWith('data:image/png;base64,'))throw new Error('사진 변환에 실패했습니다');
+  return {data,iw,ih};
+}
 function photoStatus(message){const el=$('photoStatus');if(el)el.textContent=message;}
+function readAsDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('사진 파일을 읽지 못했습니다'));r.readAsDataURL(file);});}
+let importSequence=0;
 async function importPhoto(file){
   if(!file){photoStatus('사진을 선택하지 않았습니다. 다시 선택해 주세요.');return;}
-  const isImage=(file.type||'').startsWith('image/')||/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||'');
-  if(!isImage){photoStatus('사진 파일이 아닙니다. 사진 보관함에서 JPEG 또는 PNG 사진을 선택해 주세요.');return;}
-  photoStatus('사진을 읽고 있습니다…');
-  let src;
+  const seq=++importSequence;
+  const ext=(file.name||'').split('.').pop().toLowerCase();
+  const typ=(file.type||'').toLowerCase();
+  if(!(typ.startsWith('image/')||['jpg','jpeg','png','webp','heic','heif'].includes(ext))){photoStatus('사진 파일이 아닙니다. JPEG 또는 PNG를 선택해 주세요.');return;}
+  photoStatus('⏳ 선택한 사진을 읽는 중… ('+Math.max(1,Math.round(file.size/1024))+'KB)');
+  let url=null;
   try{
-    src=URL.createObjectURL(file);
-    const img=await loadImg(src);
-    const setup=setupPhoto(img);
-    work.subject=setup.data;
-    image=await loadImg(work.subject);
+    let decoded=null;
+    try{
+      url=URL.createObjectURL(file);
+      decoded=await loadImg(url);
+    }catch(firstErr){
+      // Alternate reader path helps some browser file-provider implementations.
+      photoStatus('⏳ 다른 방법으로 사진 읽는 중…');
+      const data=await readAsDataURL(file);
+      decoded=await loadImg(data);
+    }
+    if(seq!==importSequence)return;
+    photoStatus('⏳ 사진 크기를 조절하고 미리보기를 준비하는 중…');
+    const setup=setupPhoto(decoded);
+    const ready=await loadImg(setup.data);
+    if(seq!==importSequence)return;
+    // Commit only after all decoding succeeds. Keep earlier work if a file fails.
+    image=ready;work.subject=setup.data;
     initMask(setup.iw,setup.ih);
-    work.x=450;work.y=480;
-    work.scale=Math.min(125,Math.round(650/Math.max(setup.iw,setup.ih)*100));
+    work.x=450;work.y=480;work.scale=Math.min(125,Math.max(20,Math.round(650/Math.max(setup.iw,setup.ih)*100)));
     syncControls();render();
-    photoStatus('✅ 사진을 불러왔습니다: '+(file.name||'선택한 사진'));
-    toast('사진을 불러왔어요. 이제 배경을 바꾸거나 누끼를 편집해 보세요.');
-  }catch(e){
-    photoStatus('⚠️ 선택한 사진을 읽을 수 없습니다. 사진 앱에서 사진을 공유 → 이미지 저장 또는 파일에 저장 후 JPEG/PNG로 다시 시도해 주세요.');
-    toast('사진 읽기에 실패했습니다. 사진 형식을 확인해 주세요.');
-    console.error('사진 가져오기 오류:',e);
-  }finally{if(src)URL.revokeObjectURL(src);}
+    photoStatus('✅ 사진을 가져왔습니다 ('+setup.iw+'×'+setup.ih+'). 화면에서 확인해 주세요.');
+    toast('사진을 불러왔어요! 화면에서 움직이거나 배경을 바꿔 보세요.');
+  }catch(err){
+    console.error('사진 가져오기 오류',err);
+    let msg=err&&err.message?err.message:'알 수 없는 오류';
+    if(ext==='heic'||ext==='heif'||/heic|heif/i.test(typ))msg='HEIC/HEIF 형식이 현재 Safari에서 열리지 않을 수 있습니다. 사진 앱에서 JPEG로 내보낸 뒤 다시 시도해 주세요.';
+    photoStatus('⚠️ 사진 표시 실패: '+msg);
+    toast('사진을 표시하지 못했습니다. 아래 원인 메시지를 확인해 주세요.');
+  }finally{if(url)URL.revokeObjectURL(url);}
 }
-$('photoFile').addEventListener('change',e=>{const file=e.currentTarget.files&&e.currentTarget.files[0];importPhoto(file);e.currentTarget.value='';});
+$('photoFile').addEventListener('change',e=>{const f=e.currentTarget.files?.[0];if(!f)return;importPhoto(f);e.currentTarget.value='';});
 function initMask(w,h){maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;maskCtx=maskCanvas.getContext('2d',{willReadFrequently:true});maskCtx.fillStyle='#fff';maskCtx.fillRect(0,0,w,h);maskHistory=[];}
 function saveMaskUndo(){if(!maskCanvas)return;maskHistory.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));if(maskHistory.length>8)maskHistory.shift();}
 function doBrush(px,py){if(!image||!maskCanvas)return;const p=toLocalImage(px,py);if(!p)return;maskCtx.save();maskCtx.globalCompositeOperation=activeBrush==='erase'?'destination-out':'source-over';maskCtx.fillStyle='#fff';maskCtx.beginPath();maskCtx.arc(p.x,p.y,brushSize/(work.scale/100)/2,0,2*Math.PI);maskCtx.fill();maskCtx.restore();render();}
