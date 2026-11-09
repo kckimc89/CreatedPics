@@ -24,7 +24,7 @@ function loadImg(url){return new Promise((ok,no)=>{const im=new Image;im.onload=
 function setupPhoto(img){
   const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height;
   if(!sw||!sh)throw new Error('사진 크기를 확인할 수 없습니다');
-  const max=1000,ratio=Math.min(1,max/Math.max(sw,sh));
+  const max=800,ratio=Math.min(1,max/Math.max(sw,sh));
   const iw=Math.max(1,Math.round(sw*ratio)),ih=Math.max(1,Math.round(sh*ratio));
   const c=document.createElement('canvas');c.width=iw;c.height=ih;
   const ctx=c.getContext('2d');if(!ctx)throw new Error('사진 작업 공간을 만들 수 없습니다');
@@ -39,6 +39,7 @@ function readAsDataURL(file){return new Promise((resolve,reject)=>{const r=new F
 let importSequence=0;
 async function importPhoto(file){
   if(!file){photoStatus('사진을 선택하지 않았습니다. 다시 선택해 주세요.');return;}
+  const personStatusEl=$('personStatus');if(personStatusEl)personStatusEl.textContent='사진을 먼저 가져와 주세요.';
   const seq=++importSequence;
   const ext=(file.name||'').split('.').pop().toLowerCase();
   const typ=(file.type||'').toLowerCase();
@@ -64,6 +65,7 @@ async function importPhoto(file){
     // Commit only after all decoding succeeds. Keep earlier work if a file fails.
     image=ready;work.subject=setup.data;
     initMask(setup.iw,setup.ih);
+    if(personStatusEl)personStatusEl.textContent='사진 준비 완료. ✂️ 누끼 탭의 자동 인물 따기를 누르세요.';
     work.x=450;work.y=480;work.scale=Math.min(125,Math.max(20,Math.round(650/Math.max(setup.iw,setup.ih)*100)));
     syncControls();render();
     photoStatus('✅ 사진을 가져왔습니다 ('+setup.iw+'×'+setup.ih+'). 화면에서 확인해 주세요.');
@@ -78,6 +80,66 @@ async function importPhoto(file){
 }
 $('photoFile').addEventListener('change',e=>{const f=e.currentTarget.files?.[0];if(!f)return;importPhoto(f);e.currentTarget.value='';});
 function initMask(w,h){maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;maskCtx=maskCanvas.getContext('2d',{willReadFrequently:true});maskCtx.fillStyle='#fff';maskCtx.fillRect(0,0,w,h);maskHistory=[];}
+// MediaPipe runs the pretrained person/background model *on this device*.
+// Only the model runtime and model weights are downloaded; no photo is uploaded.
+let personModel=null,personBusy=false;
+async function getPersonModel(){
+  if(personModel)return personModel;
+  const mod=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
+  const Vision=mod.default||mod;
+  const wasm=await Vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
+  personModel=await Vision.ImageSegmenter.createFromOptions(wasm,{
+    baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite',delegate:'CPU'},
+    runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:true
+  });
+  return personModel;
+}
+$('autoPerson').onclick=async()=>{
+  const status=$('personStatus'),btn=$('autoPerson');
+  if(!image||!maskCanvas){status.textContent='먼저 사진을 가져와 주세요.';return;}
+  if(personBusy)return;
+  if(!navigator.onLine&&!personModel){status.textContent='최초 모델 다운로드에 인터넷 연결이 필요합니다.';return;}
+  personBusy=true;btn.disabled=true;
+  const photoAtStart=image;
+  let result=null;
+  try{
+    status.textContent='⏳ 인물 분리 모델을 준비 중입니다. 처음 실행은 다운로드가 필요합니다.';
+    // Keep inference input small to limit iPad memory use.
+    const c=document.createElement('canvas'),factor=Math.min(1,512/Math.max(image.width,image.height));
+    c.width=Math.max(1,Math.round(image.width*factor));c.height=Math.max(1,Math.round(image.height*factor));
+    c.getContext('2d').drawImage(image,0,0,c.width,c.height);
+    const model=await getPersonModel();
+    status.textContent='⏳ 사진 속 인물을 찾고 있습니다…';
+    result=model.segment(c);
+    const cm=result.confidenceMasks?.[1];
+    const cat=result.categoryMask;
+    const srcMask=cm||cat;
+    if(!srcMask)throw Error('분리 결과를 받지 못했습니다.');
+    const mw=srcMask.width,mh=srcMask.height;
+    const pixels=cm?cm.getAsFloat32Array():cat.getAsUint8Array();
+    if(!pixels||pixels.length<mw*mh)throw Error('분리 마스크가 비어 있습니다.');
+    const tmp=document.createElement('canvas');tmp.width=mw;tmp.height=mh;
+    const tctx=tmp.getContext('2d');const frame=tctx.createImageData(mw,mh);
+    let total=0;
+    for(let i=0;i<mw*mh;i++){
+      const v=cm?Math.max(0,Math.min(1,(pixels[i]-.12)/.76)):(pixels[i]===1?1:0);
+      frame.data[4*i]=255;frame.data[4*i+1]=255;frame.data[4*i+2]=255;frame.data[4*i+3]=Math.round(v*255);
+      total+=v;
+    }
+    if(total<mw*mh*.008)throw Error('인물을 찾지 못했습니다. 사람이 크게 나온 사진으로 시험해 주세요.');
+    if(image!==photoAtStart){status.textContent='다른 사진이 선택되어 처리 결과를 적용하지 않았습니다.';return;}
+    saveMaskUndo();
+    maskCtx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+    maskCtx.imageSmoothingEnabled=true;
+    tctx.putImageData(frame,0,0);
+    maskCtx.drawImage(tmp,0,0,maskCanvas.width,maskCanvas.height);
+    status.textContent='✅ 자동 인물 분리 완료! 잘못 지워진 곳은 복구 붓으로 고쳐 주세요.';
+    toast('자동 누끼가 완성되었어요! 🎉');render();
+  }catch(err){
+    console.error('자동 인물 분리 실패',err);
+    status.textContent='⚠️ 자동 누끼 실패: '+(err?.message||'모델을 실행할 수 없습니다.')+' — 수동 도구는 계속 사용할 수 있습니다.';
+  }finally{if(result)try{result.close()}catch(_){};personBusy=false;btn.disabled=false;}
+};
 function saveMaskUndo(){if(!maskCanvas)return;maskHistory.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));if(maskHistory.length>8)maskHistory.shift();}
 function doBrush(px,py){if(!image||!maskCanvas)return;const p=toLocalImage(px,py);if(!p)return;maskCtx.save();maskCtx.globalCompositeOperation=activeBrush==='erase'?'destination-out':'source-over';maskCtx.fillStyle='#fff';maskCtx.beginPath();maskCtx.arc(p.x,p.y,brushSize/(work.scale/100)/2,0,2*Math.PI);maskCtx.fill();maskCtx.restore();render();}
 function toLocalImage(x,y){const dx=x-work.x,dy=y-work.y,angle=-work.rotation*Math.PI/180,s=work.scale/100;return {x:(dx*Math.cos(angle)-dy*Math.sin(angle))/s+image.width/2,y:(dx*Math.sin(angle)+dy*Math.cos(angle))/s+image.height/2};}
