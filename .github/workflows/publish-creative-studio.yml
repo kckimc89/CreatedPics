@@ -25,7 +25,7 @@ jobs:
           node-version: '22'
       - name: Get official MediaPipe vision runtime
         run: |
-          npm install --no-save --ignore-scripts --no-audit --no-fund @mediapipe/tasks-vision@0.10.22
+          npm install --no-save --ignore-scripts --no-audit --no-fund @mediapipe/tasks-vision@0.10.35
           mkdir -p assets/vision
           cp node_modules/@mediapipe/tasks-vision/vision_bundle.mjs assets/vision/vision_bundle.mjs
           cp -R node_modules/@mediapipe/tasks-vision/wasm assets/vision/wasm
