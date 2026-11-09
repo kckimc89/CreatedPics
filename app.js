@@ -80,81 +80,86 @@ async function importPhoto(file){
 }
 $('photoFile').addEventListener('change',e=>{const f=e.currentTarget.files?.[0];if(!f)return;importPhoto(f);e.currentTarget.value='';});
 function initMask(w,h){maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;maskCtx=maskCanvas.getContext('2d',{willReadFrequently:true});maskCtx.fillStyle='#fff';maskCtx.fillRect(0,0,w,h);maskHistory=[];}
-// MediaPipe runs the pretrained person/background model *on this device*.
-// Only the model runtime and model weights are downloaded; no photo is uploaded.
-let personModel=null,personBusy=false;
-async function getPersonModel(){
-  if(personModel)return personModel;
-  // Import the official prebundled ES module, not jsDelivr's generic +esm
-  // transformer (which can fail in Safari for WASM-based packages).
-  const version='0.10.22';
-  const urls=[
-    `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${version}/vision_bundle.mjs`,
-    `https://unpkg.com/@mediapipe/tasks-vision@${version}/vision_bundle.mjs`
-  ];
-  let mod,lastError;
-  for(const url of urls){
-    try{mod=await import(/* webpackIgnore: true */ url);break;}
-    catch(err){lastError=err;console.warn('MediaPipe module load failed:',url,err);}
-  }
-  if(!mod)throw Error('인물 분리 프로그램을 내려받지 못했습니다. 네트워크 또는 외부 CDN 접근을 확인해 주세요. ('+(lastError?.message||'모듈 오류')+')');
-  const Vision=mod.FilesetResolver?mod:mod.default;
-  if(!Vision?.FilesetResolver||!Vision?.ImageSegmenter)throw Error('인물 분리 프로그램에서 필요한 기능을 찾지 못했습니다.');
-  $('personStatus').textContent='⏳ 인물 분리 엔진을 준비하고 있습니다…';
-  const wasm=await Vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${version}/wasm`);
-  $('personStatus').textContent='⏳ 인물 분리 AI 모델을 내려받고 있습니다…';
-  personModel=await Vision.ImageSegmenter.createFromOptions(wasm,{
-    baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite',delegate:'CPU'},
-    runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:true
-  });
-  return personModel;
-}
-$('autoPerson').onclick=async()=>{
+// C1.1.2: wholly local, offline-compatible colour-background removal.
+// This is NOT AI person segmentation. It is most useful with a plain backdrop.
+let personBusy=false;
+async function localBackgroundCutout(){
   const status=$('personStatus'),btn=$('autoPerson');
-  if(!image||!maskCanvas){status.textContent='먼저 사진을 가져와 주세요.';return;}
+  if(!image||!maskCanvas){status.textContent='사진을 먼저 가져와 주세요.';return;}
   if(personBusy)return;
-  if(!navigator.onLine&&!personModel){status.textContent='최초 모델 다운로드에 인터넷 연결이 필요합니다.';return;}
   personBusy=true;btn.disabled=true;
-  const photoAtStart=image;
-  let result=null;
+  status.textContent='⏳ 사진 모서리의 배경색을 분석하고 있습니다…';
+  // Yield before CPU-intensive processing so Safari paints the status.
+  await new Promise(resolve=>setTimeout(resolve,35));
   try{
-    status.textContent='⏳ 인물 분리 모델을 준비 중입니다. 처음 실행은 다운로드가 필요합니다.';
-    // Keep inference input small to limit iPad memory use.
-    const c=document.createElement('canvas'),factor=Math.min(1,512/Math.max(image.width,image.height));
-    c.width=Math.max(1,Math.round(image.width*factor));c.height=Math.max(1,Math.round(image.height*factor));
-    c.getContext('2d').drawImage(image,0,0,c.width,c.height);
-    const model=await getPersonModel();
-    status.textContent='⏳ 사진 속 인물을 찾고 있습니다…';
-    result=model.segment(c);
-    const cm=result.confidenceMasks?.[1];
-    const cat=result.categoryMask;
-    const srcMask=cm||cat;
-    if(!srcMask)throw Error('분리 결과를 받지 못했습니다.');
-    const mw=srcMask.width,mh=srcMask.height;
-    const pixels=cm?cm.getAsFloat32Array():cat.getAsUint8Array();
-    if(!pixels||pixels.length<mw*mh)throw Error('분리 마스크가 비어 있습니다.');
-    const tmp=document.createElement('canvas');tmp.width=mw;tmp.height=mh;
-    const tctx=tmp.getContext('2d');const frame=tctx.createImageData(mw,mh);
-    let total=0;
-    for(let i=0;i<mw*mh;i++){
-      const v=cm?Math.max(0,Math.min(1,(pixels[i]-.12)/.76)):(pixels[i]===1?1:0);
-      frame.data[4*i]=255;frame.data[4*i+1]=255;frame.data[4*i+2]=255;frame.data[4*i+3]=Math.round(v*255);
-      total+=v;
+    const iw=image.width,ih=image.height;
+    const ratio=Math.min(1,420/Math.max(iw,ih));
+    const w=Math.max(1,Math.round(iw*ratio)),h=Math.max(1,Math.round(ih*ratio));
+    const small=document.createElement('canvas');small.width=w;small.height=h;
+    const sc=small.getContext('2d',{willReadFrequently:true});
+    sc.drawImage(image,0,0,w,h);
+    const pix=sc.getImageData(0,0,w,h).data;
+    const tol=Number($('backgroundTolerance').value);
+    // Sampling near each corner makes the result less sensitive to different
+    // lighting in the top/bottom halves of a studio photo.
+    const offs=[0.012,0.045];const seeds=[];
+    for(const oy of offs)for(const ox of offs){
+      for(const [xx,yy] of [[ox,oy],[1-ox,oy],[ox,1-oy],[1-ox,1-oy]]){
+        const x=Math.min(w-1,Math.max(0,Math.floor(xx*w)));
+        const y=Math.min(h-1,Math.max(0,Math.floor(yy*h)));
+        const index=(y*w+x)*4;seeds.push([x,y,pix[index],pix[index+1],pix[index+2]]);
+      }
     }
-    if(total<mw*mh*.008)throw Error('인물을 찾지 못했습니다. 사람이 크게 나온 사진으로 시험해 주세요.');
-    if(image!==photoAtStart){status.textContent='다른 사진이 선택되어 처리 결과를 적용하지 않았습니다.';return;}
+    const n=w*h,removed=new Uint8Array(n),seen=new Uint8Array(n),queue=new Uint32Array(n);
+    let tail=0,head=0;
+    const dist=(j,r,g,b)=>{const dr=pix[j]-r,dg=pix[j+1]-g,db=pix[j+2]-b;
+      return Math.sqrt((dr*dr+dg*dg+db*db)/3);};
+    function attempt(idx,r,g,b){
+      if(seen[idx])return;seen[idx]=1;
+      if(dist(idx*4,r,g,b)>tol)return;
+      removed[idx]=1;queue[tail++]=idx;
+    }
+    // Independent flood fills from corners; do not flood a face/garment just
+    // because it happens to share another corner's colour.
+    for(const [sx,sy,sr,sg,sb] of seeds){
+      head=0;tail=0;
+      const localVisited=new Uint8Array(n);
+      const first=sy*w+sx;if(dist(first*4,sr,sg,sb)>tol)continue;
+      queue[tail++]=first;localVisited[first]=1;
+      while(head<tail){
+        const k=queue[head++],j=k*4,x=k%w,y=(k/w)|0;
+        if(dist(j,sr,sg,sb)>tol)continue;
+        removed[k]=1;
+        const push=z=>{if(!localVisited[z]){localVisited[z]=1;queue[tail++]=z;}};
+        if(x>0)push(k-1);if(x<w-1)push(k+1);
+        if(y>0)push(k-w);if(y<h-1)push(k+w);
+      }
+    }
+    let cut=0;for(const bit of removed)cut+=bit;
+    if(cut/n<0.025)throw Error('지울 배경이 거의 없습니다. 배경이 단색에 가까운 사진으로 시험해 주세요.');
+    if(cut/n>0.94)throw Error('너무 많은 부분이 배경으로 인식되었습니다. 민감도를 낮춰 주세요.');
+    // Preserve the source photo. Replace only the editable transparency mask.
+    const maskData=sc.createImageData(w,h);
+    for(let i=0;i<n;i++){
+      maskData.data[i*4]=maskData.data[i*4+1]=maskData.data[i*4+2]=255;
+      maskData.data[i*4+3]=removed[i]?0:255;
+    }
+    const temp=document.createElement('canvas');temp.width=w;temp.height=h;
+    temp.getContext('2d').putImageData(maskData,0,0);
     saveMaskUndo();
-    maskCtx.clearRect(0,0,maskCanvas.width,maskCanvas.height);
+    maskCtx.clearRect(0,0,iw,ih);
     maskCtx.imageSmoothingEnabled=true;
-    tctx.putImageData(frame,0,0);
-    maskCtx.drawImage(tmp,0,0,maskCanvas.width,maskCanvas.height);
-    status.textContent='✅ 자동 인물 분리 완료! 잘못 지워진 곳은 복구 붓으로 고쳐 주세요.';
-    toast('자동 누끼가 완성되었어요! 🎉');render();
+    maskCtx.drawImage(temp,0,0,iw,ih);
+    render();
+    status.textContent='✅ 배경색 자동 제거 완료 ('+Math.round(cut/n*100)+'%). 머리카락·옷 주변을 확인하고 지우개/복구 붓으로 다듬어 주세요.';
+    toast('배경을 지웠어요. 가장자리를 확인해 주세요.');
   }catch(err){
-    console.error('자동 인물 분리 실패',err);
-    status.textContent='⚠️ 자동 누끼 실패: '+(err?.message||'모델을 실행할 수 없습니다.')+' — 수동 도구는 계속 사용할 수 있습니다.';
-  }finally{if(result)try{result.close()}catch(_){};personBusy=false;btn.disabled=false;}
-};
+    console.error('로컬 배경 제거 실패',err);
+    status.textContent='⚠️ 배경 제거 실패: '+(err?.message||'처리할 수 없습니다.')+' 원본은 유지됩니다.';
+  }finally{personBusy=false;btn.disabled=false;}
+}
+$('autoPerson').onclick=localBackgroundCutout;
+$('backgroundTolerance').oninput=e=>{$('backgroundToleranceValue').textContent=e.target.value;};
 function saveMaskUndo(){if(!maskCanvas)return;maskHistory.push(maskCtx.getImageData(0,0,maskCanvas.width,maskCanvas.height));if(maskHistory.length>8)maskHistory.shift();}
 function doBrush(px,py){if(!image||!maskCanvas)return;const p=toLocalImage(px,py);if(!p)return;maskCtx.save();maskCtx.globalCompositeOperation=activeBrush==='erase'?'destination-out':'source-over';maskCtx.fillStyle='#fff';maskCtx.beginPath();maskCtx.arc(p.x,p.y,brushSize/(work.scale/100)/2,0,2*Math.PI);maskCtx.fill();maskCtx.restore();render();}
 function toLocalImage(x,y){const dx=x-work.x,dy=y-work.y,angle=-work.rotation*Math.PI/180,s=work.scale/100;return {x:(dx*Math.cos(angle)-dy*Math.sin(angle))/s+image.width/2,y:(dx*Math.sin(angle)+dy*Math.cos(angle))/s+image.height/2};}
@@ -174,7 +179,7 @@ function stageCoords(e){const r=scene.getBoundingClientRect();return{x:(e.client
 scene.addEventListener('pointerdown',e=>{if(!image&&activeTab==='cutout')return;const {x,y}=stageCoords(e);scene.setPointerCapture(e.pointerId);if(activeTab==='cutout'){dragging={type:'brush'};saveMaskUndo();doBrush(x,y);return;}for(let i=work.stickers.length-1;i>=0;i--){const s=work.stickers[i];if(Math.hypot(s.x-x,s.y-y)<Math.max(45,s.size*.6)){selectedSticker=i;dragging={type:'sticker',dx:x-s.x,dy:y-s.y};$('stickerSize').value=s.size;$('stickerSizeValue').textContent=s.size;return;}}if(image){selectedSticker=-1;dragging={type:'subject',dx:x-work.x,dy:y-work.y};}});
 scene.addEventListener('pointermove',e=>{if(!dragging)return;const{x,y}=stageCoords(e);if(dragging.type==='brush')doBrush(x,y);else if(dragging.type==='subject'){work.x=x-dragging.dx;work.y=y-dragging.dy;render();}else if(dragging.type==='sticker'){const s=work.stickers[selectedSticker];if(s){s.x=x-dragging.dx;s.y=y-dragging.dy;render();}}});for(const type of ['pointerup','pointercancel','lostpointercapture'])scene.addEventListener(type,()=>dragging=null);
 for(const btn of document.querySelectorAll('[data-brush]'))btn.onclick=()=>{activeBrush=btn.dataset.brush;document.querySelectorAll('[data-brush]').forEach(b=>b.classList.toggle('selected-tool',b===btn));};$('brushSize').oninput=e=>{$('brushValue').textContent=e.target.value;brushSize=+e.target.value;};$('undoMask').onclick=()=>{if(!maskHistory.length)return toast('되돌릴 작업이 없어요.');maskCtx.putImageData(maskHistory.pop(),0,0);render();};$('resetMask').onclick=()=>{if(!image)return;saveMaskUndo();maskCtx.fillStyle='#fff';maskCtx.fillRect(0,0,maskCanvas.width,maskCanvas.height);render();};
-$('autoCorners').onclick=()=>{if(!image)return toast('사진을 먼저 선택하세요.');const max=800000,iw=image.width,ih=image.height;if(iw*ih>max){toast('자동 지우기: 큰 사진은 붓으로 지우거나 투명 PNG를 사용해 주세요.');return;}saveMaskUndo();const c=document.createElement('canvas');c.width=iw;c.height=ih;const ct=c.getContext('2d',{willReadFrequently:true});ct.drawImage(image,0,0);const data=ct.getImageData(0,0,iw,ih).data;const visited=new Uint8Array(iw*ih);const found=new Uint8Array(iw*ih);const stack=[];const corners=[0,iw-1,(ih-1)*iw,iw*ih-1];const threshold=65;for(const start of corners){const sr=data[start*4],sg=data[start*4+1],sb=data[start*4+2];stack.push(start);while(stack.length){const n=stack.pop();if(n<0||n>=iw*ih||visited[n])continue;visited[n]=1;const j=n*4;const delta=Math.abs(data[j]-sr)+Math.abs(data[j+1]-sg)+Math.abs(data[j+2]-sb);if(delta>threshold)continue;found[n]=1;const xx=n%iw,yy=(n/iw)|0;if(xx>0)stack.push(n-1);if(xx+1<iw)stack.push(n+1);if(yy>0)stack.push(n-iw);if(yy+1<ih)stack.push(n+iw);}}const v=maskCtx.getImageData(0,0,iw,ih);for(let i=0;i<found.length;i++)if(found[i])v.data[i*4+3]=0;maskCtx.putImageData(v,0,0);render();toast('모서리 배경을 지웠어요. 정확하지 않으면 되돌리기를 사용하세요.');};
+$('autoCorners').onclick=localBackgroundCutout;
 $('deleteSticker').onclick=()=>{if(selectedSticker<0)return toast('먼저 화면에서 장식을 선택해 주세요.');work.stickers.splice(selectedSticker,1);selectedSticker=-1;render();};$('clearSticker').onclick=()=>{work.stickers=[];selectedSticker=-1;render();};$('stickerSize').oninput=e=>{const v=+e.target.value;$('stickerSizeValue').textContent=v;if(selectedSticker>=0&&work.stickers[selectedSticker]){work.stickers[selectedSticker].size=v;render();}};
 function initDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DBNAME,1);r.onupgradeneeded=()=>{r.result.createObjectStore(STORE,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}async function ensureDb(){if(!db)db=await initDb();return db;}
 async function put(item){const d=await ensureDb();return new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).put(item);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}async function all(){const d=await ensureDb();return new Promise((resolve,reject)=>{const r=d.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}async function del(id){const d=await ensureDb();return new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
