@@ -8,3 +8,6 @@
 .photo-picker{display:block;max-width:100%;width:100%;font-size:16px;color:#35263c;min-height:38px}
 .photo-picker::file-selector-button{background:#8251a6;color:#fff;border:0;border-radius:10px;padding:12px 14px;margin-right:8px;font-weight:750;font-size:15px;cursor:pointer}
 .photo-status{font-size:13px;color:#655872;margin-top:9px;line-height:1.5;overflow-wrap:anywhere}
+
+/* C1.1.5: travel background picker */
+.travel-import{margin-top:17px;padding:13px;border:1px solid #dfcdea;border-radius:14px;background:#faf5ff}.travel-import h3{margin:0 0 6px}.travel-import .photo-picker-title{margin-top:12px}.travel-import label{margin-bottom:9px}.travel-import input[type=text]{background:white}#travelBackgroundAdjust[hidden]{display:none}
