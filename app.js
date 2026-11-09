@@ -85,9 +85,24 @@ function initMask(w,h){maskCanvas=document.createElement('canvas');maskCanvas.wi
 let personModel=null,personBusy=false;
 async function getPersonModel(){
   if(personModel)return personModel;
-  const mod=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
-  const Vision=mod.default||mod;
-  const wasm=await Vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
+  // Import the official prebundled ES module, not jsDelivr's generic +esm
+  // transformer (which can fail in Safari for WASM-based packages).
+  const version='0.10.22';
+  const urls=[
+    `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${version}/vision_bundle.mjs`,
+    `https://unpkg.com/@mediapipe/tasks-vision@${version}/vision_bundle.mjs`
+  ];
+  let mod,lastError;
+  for(const url of urls){
+    try{mod=await import(/* webpackIgnore: true */ url);break;}
+    catch(err){lastError=err;console.warn('MediaPipe module load failed:',url,err);}
+  }
+  if(!mod)throw Error('인물 분리 프로그램을 내려받지 못했습니다. 네트워크 또는 외부 CDN 접근을 확인해 주세요. ('+(lastError?.message||'모듈 오류')+')');
+  const Vision=mod.FilesetResolver?mod:mod.default;
+  if(!Vision?.FilesetResolver||!Vision?.ImageSegmenter)throw Error('인물 분리 프로그램에서 필요한 기능을 찾지 못했습니다.');
+  $('personStatus').textContent='⏳ 인물 분리 엔진을 준비하고 있습니다…';
+  const wasm=await Vision.FilesetResolver.forVisionTasks(`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${version}/wasm`);
+  $('personStatus').textContent='⏳ 인물 분리 AI 모델을 내려받고 있습니다…';
   personModel=await Vision.ImageSegmenter.createFromOptions(wasm,{
     baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite',delegate:'CPU'},
     runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:true
