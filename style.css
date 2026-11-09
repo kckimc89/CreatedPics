@@ -24,3 +24,5 @@
 .fantasy-actions{display:flex;flex-wrap:wrap;gap:8px;margin:11px 0 18px}
 .fantasy-actions .button{flex:1 1 160px}
 @media(max-width:380px){#backgrounds{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.ai-tile{background:linear-gradient(120deg,#f4e5ff,#e8f2ff);text-decoration:none;border:2px solid #a77ad2}.ai-tile:hover{border-color:#8050ad}
