@@ -131,11 +131,19 @@ $('autoPerson').onclick=async()=>{
     const model=await getPersonModel();
     status.textContent='⏳ 사진 속 인물을 찾고 있습니다…';
     result=model.segment(c);
-    const cm=result.confidenceMasks?.[1];
-    const cat=result.categoryMask;
+    // The single-channel SelfieSegmenter produces ONE foreground confidence
+    // mask at index 0. Earlier versions mistakenly requested index 1 and
+    // therefore always reported "분리 결과를 받지 못했습니다" even after inference.
+    const masks=result?.confidenceMasks;
+    const cm=Array.isArray(masks)&&masks.length ? masks[0] : null;
+    const cat=result?.categoryMask;
     const srcMask=cm||cat;
-    if(!srcMask)throw Error('분리 결과를 받지 못했습니다.');
+    if(!srcMask){
+      const count=Array.isArray(masks)?masks.length:0;
+      throw Error('AI 처리 결과에 마스크가 없습니다 (confidenceMasks='+count+', categoryMask='+!!cat+').');
+    }
     const mw=srcMask.width,mh=srcMask.height;
+    if(!mw||!mh)throw Error('AI 마스크 크기를 확인할 수 없습니다.');
     const pixels=cm?cm.getAsFloat32Array():cat.getAsUint8Array();
     if(!pixels||pixels.length<mw*mh)throw Error('분리 마스크가 비어 있습니다.');
     const tmp=document.createElement('canvas');tmp.width=mw;tmp.height=mh;
