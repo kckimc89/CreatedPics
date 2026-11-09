@@ -14,7 +14,7 @@ function makeChoices(id,items,callback){const parent=$(id);parent.innerHTML='';i
 makeChoices('backgrounds',BACKS,k=>{work.background=k;work.backgroundPhoto='';travelBackgroundImage=null;loadedTravelBackgroundData='';syncControls();render();});makeChoices('frames',FRAMES,k=>{work.frame=k;syncControls();render();});
 const decorations=['⭐','🦋','🌸','💖','🎈','🌙','✨','☁️','🌈','🐚','🪄','🎉','🪐','🧸'];
 for(const icon of decorations){const b=document.createElement('button');b.textContent=icon;b.title='장식 추가 '+icon;b.onclick=()=>{work.stickers.push({text:icon,x:450+Math.random()*140-70,y:450+Math.random()*140-70,size:80});selectedSticker=work.stickers.length-1;render();};$('stickers').append(b);}
-function syncControls(){const place=$('placeName');if(place)place.value=work.placeName||'';for(const [id,val] of [['bgZoom',work.backgroundZoom||100],['bgX',work.backgroundX||0],['bgY',work.backgroundY||0]]){if($(id)){$(id).value=val;$(id+'Value').textContent=id==='bgZoom'?val+'%':String(val);}}$('travelBackgroundAdjust').hidden=work.background!=='travel';$('overwriteProject').hidden=!editingSourceId;for(const b of document.querySelectorAll('#backgrounds .choice'))b.classList.toggle('selected',b.dataset.value===work.background);for(const b of document.querySelectorAll('#frames .choice'))b.classList.toggle('selected',b.dataset.value===work.frame);for(const [name,val,suffix] of [['scale',work.scale,'%'],['rotate',work.rotation,'°'],['shadow',work.shadow,'%'],['frameSize',work.frameSize,'%']]){$(name).value=val;$(name+'Value').textContent=val+suffix;}$('artText').value=work.caption||'';$('artName').value=work.name||'';$('popSettings').style.display=work.mode==='pop'?'block':'none';$('modeLabel').textContent=work.mode==='magic'?'마법 합성사진':'입체사진';}
+function syncControls(){const place=$('placeName');if(place)place.value=work.placeName||'';for(const [id,val] of [['bgZoom',work.backgroundZoom||100],['bgX',work.backgroundX||0],['bgY',work.backgroundY||0]]){if($(id)){$(id).value=val;$(id+'Value').textContent=id==='bgZoom'?val+'%':String(val);}}$('travelBackgroundAdjust').hidden=work.background!=='travel';$('overwriteProject').hidden=!editingSourceId;for(const b of document.querySelectorAll('#backgrounds .choice'))b.classList.toggle('selected',b.dataset.value===work.background);for(const b of document.querySelectorAll('#frames .choice'))b.classList.toggle('selected',b.dataset.value===work.frame);for(const [name,val,suffix] of [['scale',work.scale,'%'],['rotate',work.rotation,'°'],['shadow',work.shadow,'%'],['frameSize',work.frameSize,'%']]){$(name).value=val;$(name+'Value').textContent=val+suffix;}$('artText').value=work.caption||'';$('artName').value=work.name||'';$('artName').placeholder=suggestedWorkName(work);$('popSettings').style.display=work.mode==='pop'?'block':'none';$('modeLabel').textContent=work.mode==='magic'?'마법 합성사진':'입체사진';}
 function begin(m){work=defaultWork();work.mode=m;work.background=m==='pop'?'plain':'flowers';image=null;originalCanvas=null;maskCanvas=null;maskHistory=[];currentId=null;editingSourceId=null;travelBackgroundImage=null;loadedTravelBackgroundData='';selectedSticker=-1;syncControls();showTab('setting');screen('editor');render();}
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>begin(b.dataset.mode));$('homeBtn').onclick=()=>screen('home');$('backToHome').onclick=()=>screen('home');$('galleryHome').onclick=()=>screen('home');$('backupHome').onclick=()=>screen('home');$('galleryOpen').onclick=()=>openGallery();$('backupOpen').onclick=()=>screen('backup');document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 for(const id of ['scale','rotate','shadow','frameSize'])$(id).addEventListener('input',e=>{work[id==='rotate'?'rotation':id]=+e.target.value;syncRange(id);render();});function syncRange(id){const s=id==='rotate'?'°':'%';$(id+'Value').textContent=work[id==='rotate'?'rotation':id]+s;}
@@ -216,11 +216,18 @@ $('deleteSticker').onclick=()=>{if(selectedSticker<0)return toast('먼저 화면
 function initDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DBNAME,1);r.onupgradeneeded=()=>{r.result.createObjectStore(STORE,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}async function ensureDb(){if(!db)db=await initDb();return db;}
 async function put(item){const d=await ensureDb();return new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).put(item);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}async function all(){const d=await ensureDb();return new Promise((resolve,reject)=>{const r=d.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}async function del(id){const d=await ensureDb();return new Promise((resolve,reject)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 function imageSave(){return scene.toDataURL('image/png');}
+function suggestedWorkName(w){
+  if(w.mode==='pop')return '사진 밖으로 나온 날';
+  if(w.background==='travel')return (w.placeName?.trim()||'가족 여행')+' 상상여행';
+  const title={flowers:'꽃밭의 주인공',space:'나의 우주 탐험',sea:'신나는 바닷속 여행',castle:'동화 속 주인공',sunset:'노을빛 마법사진',stars:'반짝이는 별빛 여행',plain:'나의 마법사진'};
+  return title[w.background]||'나의 마법 작품';
+}
+
 async function save(overwrite=false){if(!image)return toast('사진을 먼저 가져와 주세요.');
  if(overwrite&&!editingSourceId)return toast('수정할 기존 작품이 없습니다.');
  if(overwrite&&!confirm('기존 작품을 이 모습으로 수정할까요? 새 작품으로 저장하면 원래 작품이 보존됩니다.'))return;
  try{
-  const item=structuredClone(work);item.name=$('artName').value.trim()||'나의 마법 작품';item.caption=$('artText').value;
+  const item=structuredClone(work);item.name=$('artName').value.trim()||suggestedWorkName(work);item.caption=$('artText').value;
   item.id=overwrite?editingSourceId:('art_'+Date.now()+'_'+Math.random().toString(36).slice(2,9));
   item.created=overwrite?work.created:Date.now();item.mask=maskCanvas.toDataURL('image/png');item.preview=imageSave();
   item.backgroundPhoto=work.background==='travel'?work.backgroundPhoto:'';
@@ -234,14 +241,41 @@ $('saveProject').onclick=()=>save(false);$('overwriteProject').onclick=()=>save(
 function downloadBlob(blob,name){const a=document.createElement('a'),u=URL.createObjectURL(blob);a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),20000);}
 function pngDownload(){scene.toBlob(blob=>{if(!blob)return toast('이미지를 만들지 못했습니다.');downloadBlob(blob,(work.name||'우리_가족_창작사진')+'.png');toast('이미지 파일을 만들었습니다. 아이패드에서는 파일 앱 또는 공유 메뉴에서 사진에 저장할 수 있습니다.');},'image/png');}
 $('exportPng').onclick=pngDownload;$('exportPng2').onclick=pngDownload;
-async function openGallery(){try{projectsCache=(await all()).sort((a,b)=>b.created-a.created);$('workCount').textContent=`(${projectsCache.length})`;$('emptyGallery').style.display=projectsCache.length?'none':'block';$('galleryGrid').replaceChildren();for(const item of projectsCache){const card=document.createElement('button');card.className='work-card';const img=document.createElement('img');img.src=item.preview;img.alt=item.name;const d=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');b.textContent=item.name;s.textContent=(item.mode==='magic'?'마법 합성':'입체 사진')+' · '+new Date(item.created).toLocaleDateString('ko-KR');d.append(b,s);card.append(img,d);card.onclick=()=>view(item.id);$('galleryGrid').append(card);}screen('gallery');}catch(e){toast('저장된 작품을 읽지 못했습니다.');console.error(e);}}
-function view(id){const item=projectsCache.find(v=>v.id===id);if(!item)return;modalId=id;$('modalTitle').textContent=item.name;$('modalImage').src=item.preview;$('viewModal').classList.remove('hidden');}
+let galleryFilter='all';
+function visibleProjects(){return galleryFilter==='favorites'?projectsCache.filter(item=>item.favorite===true):projectsCache;}
+function renderGalleryCards(){
+ $('galleryAll').classList.toggle('selected-filter',galleryFilter==='all');
+ $('galleryFavorites').classList.toggle('selected-filter',galleryFilter==='favorites');
+ $('workCount').textContent=`(${projectsCache.length})`;
+ const selected=visibleProjects();
+ $('emptyGallery').style.display=selected.length?'none':'block';
+ $('emptyGallery').textContent=galleryFilter==='favorites'?'아직 즐겨찾기한 작품이 없어요. 작품을 열고 ☆를 눌러보세요.':'아직 작품이 없어요. 첫 마법 사진을 만들어 볼까요? ✨';
+ $('galleryGrid').replaceChildren();
+ for(const item of selected){
+   const card=document.createElement('button');card.className='work-card';
+   const img=document.createElement('img');img.src=item.preview;img.alt=item.name||'창작사진';
+   const d=document.createElement('div'),b=document.createElement('b'),s=document.createElement('span');
+   b.textContent=(item.favorite?'⭐ ':'')+(item.name||'나의 마법 작품');
+   s.textContent=(item.background==='travel'?'상상 여행':item.mode==='magic'?'마법 합성':'입체 사진')+' · '+new Date(item.created).toLocaleDateString('ko-KR');
+   d.append(b,s);card.append(img,d);card.onclick=()=>view(item.id);$('galleryGrid').append(card);
+ }
+}
+async function openGallery(){try{projectsCache=(await all()).sort((a,b)=>b.created-a.created);renderGalleryCards();screen('gallery');}catch(e){toast('저장된 작품을 읽지 못했습니다.');console.error(e);}}
+$('galleryAll').onclick=()=>{stopSlide();galleryFilter='all';renderGalleryCards();};
+$('galleryFavorites').onclick=()=>{stopSlide();galleryFilter='favorites';renderGalleryCards();};
+function view(id){const item=projectsCache.find(v=>v.id===id);if(!item)return;modalId=id;$('modalTitle').textContent=item.name;$('modalImage').src=item.preview;$('modalFavorite').textContent=item.favorite?'⭐ 즐겨찾기 해제':'☆ 즐겨찾기';$('viewModal').classList.remove('hidden');}
 $('modalClose').onclick=()=>{$('viewModal').classList.add('hidden');stopSlide();};
 $('viewModal').addEventListener('click',e=>{if(e.target===$('viewModal'))$('modalClose').click();});
 async function edit(id){const item=projectsCache.find(v=>v.id===id);if(!item)return;try{work=structuredClone(item);image=await loadImg(item.subject);initMask(image.width,image.height);if(item.mask){const mi=await loadImg(item.mask);maskCtx.clearRect(0,0,image.width,image.height);maskCtx.drawImage(mi,0,0,image.width,image.height);}currentId=null;editingSourceId=item.id;travelBackgroundImage=null;loadedTravelBackgroundData='';if(item.background==='travel'&&item.backgroundPhoto){travelBackgroundImage=await loadImg(item.backgroundPhoto);loadedTravelBackgroundData=item.backgroundPhoto;}maskHistory=[];selectedSticker=-1;syncControls();showTab('setting');$('viewModal').classList.add('hidden');stopSlide();screen('editor');render();}catch(e){console.error(e);toast('편집 자료를 불러오지 못했습니다.');}}
+$('modalFavorite').onclick=async()=>{
+ const item=projectsCache.find(v=>v.id===modalId);if(!item)return;
+ const next={...item,favorite:!item.favorite};
+ try{await put(next);projectsCache=projectsCache.map(v=>v.id===item.id?next:v);view(item.id);renderGalleryCards();toast(next.favorite?'즐겨찾기에 추가했습니다.':'즐겨찾기를 해제했습니다.');}
+ catch(e){console.error(e);toast('즐겨찾기를 저장하지 못했습니다.');}
+};
 $('modalEdit').onclick=()=>edit(modalId);$('modalDownload').onclick=()=>{const item=projectsCache.find(v=>v.id===modalId);if(!item)return;fetch(item.preview).then(r=>r.blob()).then(blob=>downloadBlob(blob,item.name+'.png')).catch(()=>toast('이미지 저장에 실패했습니다.'));};$('modalDelete').onclick=async()=>{if(!confirm('이 작품을 전시관에서 삭제할까요? 되돌릴 수 없습니다.'))return;try{await del(modalId);$('viewModal').classList.add('hidden');stopSlide();await openGallery();toast('선택한 작품을 삭제했습니다.');}catch(e){toast('삭제하지 못했습니다.');}};
 function stopSlide(){if(slideTimer){clearInterval(slideTimer);slideTimer=null;}}
-$('slideStop').onclick=()=>{stopSlide();toast('자동 감상을 멈췄어요.');};$('slideStart').onclick=()=>{if(!projectsCache.length)return toast('먼저 작품을 만들어 주세요.');stopSlide();let i=0;view(projectsCache[i].id);slideTimer=setInterval(()=>{i=(i+1)%projectsCache.length;view(projectsCache[i].id);},4500);};
+$('slideStop').onclick=()=>{stopSlide();toast('자동 감상을 멈췄어요.');};$('slideStart').onclick=()=>{const items=visibleProjects();if(!items.length)return toast('감상할 작품이 없습니다.');stopSlide();let i=0;view(items[i].id);slideTimer=setInterval(()=>{i=(i+1)%items.length;view(items[i].id);},Number($('slideSpeed').value)||5000);};
 $('backupDownload').onclick=async()=>{try{const items=await all();const payload={format:'family-creative-studio',version:1,exported:new Date().toISOString(),items};const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});downloadBlob(blob,'창작사진관_전체백업_'+new Date().toISOString().slice(0,10)+'.json');toast(`${items.length}개 작품의 백업 파일을 만들었습니다. 파일 앱에 꼭 보관해 주세요.`);}catch(e){console.error(e);toast('백업에 실패했습니다. 저장 공간을 확인해 주세요.');}};
 $('backupFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-studio'||!Array.isArray(o.items))throw Error('invalid');const existing=new Set((await all()).map(v=>v.id));let n=0;for(const item of o.items){if(!item.id||typeof item.subject!=='string'||typeof item.preview!=='string')continue;if(existing.has(item.id))continue;await put(item);n++;}toast(`${n}개 작품을 복원했습니다. 기존 작품은 보존했습니다.`);}catch(err){console.error(err);toast('올바른 창작사진관 백업 파일이 아니거나 복원 중 오류가 발생했습니다.');}finally{e.target.value='';}};
 window.addEventListener('pagehide',stopSlide);
