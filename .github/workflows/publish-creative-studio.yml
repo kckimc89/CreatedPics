@@ -1,0 +1,54 @@
+name: Publish creative studio with local cutout AI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Get official MediaPipe vision runtime
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund @mediapipe/tasks-vision@0.10.22
+          mkdir -p assets/vision
+          cp node_modules/@mediapipe/tasks-vision/vision_bundle.mjs assets/vision/vision_bundle.mjs
+          cp -R node_modules/@mediapipe/tasks-vision/wasm assets/vision/wasm
+          test -s assets/vision/vision_bundle.mjs
+          test -s assets/vision/wasm/vision_wasm_internal.wasm
+      - name: Get person segmentation model
+        run: |
+          curl --fail --location --retry 4 --retry-delay 3 \
+            https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite \
+            -o assets/vision/selfie_segmenter.tflite
+          test "$(wc -c < assets/vision/selfie_segmenter.tflite)" -gt 100000
+      - name: Prepare publish directory
+        run: |
+          mkdir -p public
+          cp index.html app.js style.css manifest.webmanifest public/
+          cp -R assets public/assets
+          touch public/.nojekyll
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
