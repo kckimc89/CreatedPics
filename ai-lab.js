@@ -1,4 +1,4 @@
-/* MASTER C1.4.11 — improved face fidelity, anatomy, pose and lighting prompts. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.12 — improved face fidelity, anatomy, pose and lighting prompts. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -147,30 +147,54 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
 $('updateInfo').onclick=async()=>{if(!active||!editMode){message('먼저 아래 보관함에서 수정할 작품을 선택해 주세요.');return;}const item=works.find(w=>w.id===active);if(!item){message('수정할 작품을 찾지 못했습니다.');return;}
   const updated={...item,scene:$('resultScene').value,name:$('workTitle').value.trim()||titleFor($('resultScene').value),note:$('workNote').value.trim(),face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore')};try{await put(updated);dirty=false;await refresh();message('✅ 작품 정보만 수정했습니다. 원본·결과 사진과 수정 연결 관계는 유지했습니다.');}catch(e){message('⚠️ 작품 정보 수정에 실패했습니다. 먼저 백업해 주세요.');}};
 $('newWork').onclick=()=>{const parent=repairParent&&works.find(w=>w.id===repairParent);newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
-// C1.4.11: backups are read-only; no changes to the works/presets databases.
-function backupSize(items,ps){let chars=2048;for(const w of items){chars+=(w.original?.length||0)+(w.result?.length||0)+JSON.stringify({...w,original:'',result:''}).length+200;}for(const p of ps)chars+=JSON.stringify(p).length+20;return chars*2;} // conservative in-memory estimate
+// C1.4.12: bounded, read-only backup. Existing database names and records stay unchanged.
 function humanBytes(n){return n>=1048576?(n/1048576).toFixed(1)+'MB':(n/1024).toFixed(0)+'KB';}
-function downloadJson(obj,filename){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);return blob.size;}
 function backupPayload(items,ps){return {format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets:ps};}
-let backingUp=false;
-async function doBackup(items,filename,kind){
- if(backingUp)return;
- if(!presetReady){message('⚠️ 조합 저장소를 읽지 못했습니다. 전체 자료가 빠지는 백업은 만들지 않습니다.');return;}
- if(!items.length){message('⚠️ 백업할 작품이 없습니다.');return;}
- const estimated=backupSize(items,presets);
- const sizeLabel=humanBytes(estimated);
- if(estimated>25*1048576){message('⚠️ 예상 메모리 사용량 '+sizeLabel+'입니다. 전체 백업을 중단했습니다. 작품별 백업을 사용해 주세요.');return;}
- if(!confirm(kind+' '+items.length+'장과 마법 조합 '+presets.length+'개를 백업합니다. 예상 작업 메모리 약 '+sizeLabel+'입니다. 계속할까요?'))return;
- backingUp=true;$('backup').disabled=true;$('backupOne').disabled=true;
- try{const bytes=downloadJson(backupPayload(items,presets),filename);message('✅ '+kind+' 백업 다운로드를 요청했습니다 ('+humanBytes(bytes)+'). 파일 앱에서 실제 파일과 크기를 반드시 확인해 주세요.');}
- catch(e){message('⚠️ 백업 생성에 실패했습니다 ('+(e?.name||'오류')+'). 기존 작품은 변경하지 않았습니다.');}
- finally{backingUp=false;$('backup').disabled=false;$('backupOne').disabled=false;}
+function downloadJson(obj,filename){
+ const json=JSON.stringify(obj);const blob=new Blob([json],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ return blob.size;
 }
-$('backup').onclick=async()=>{try{const items=await fetchAll();await doBackup(items,'AI_마법변신_전체백업_'+new Date().toISOString().slice(0,10)+'.json','전체');}catch(e){message('⚠️ 작품 목록을 읽지 못해 백업을 중단했습니다.');}};
-$('backupOne').onclick=async()=>{if(!active){message('먼저 ④ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}try{const w=await transact('readonly',s=>s.get(active));if(!w){message('선택한 작품을 찾지 못했습니다.');return;}const safeName=(w.name||'작품').replace(/[\\/:*?"<>|]/g,'_').slice(0,35);await doBackup([w],'AI_마법변신_개별백업_'+safeName+'_'+new Date().toISOString().slice(0,10)+'.json','개별');}catch(e){message('⚠️ 개별 작품을 읽지 못했습니다.');}};
+let backingUp=false;
+function backupLock(on){backingUp=on;$('backup').disabled=on;$('backupOne').disabled=on;}
+async function exportBackup(items,filename,kind){
+ if(backingUp)return;
+ if(!presetReady){message('⚠️ 조합 저장소를 읽지 못했습니다. 불완전한 백업을 만들지 않습니다.');return;}
+ if(!items.length){message('⚠️ 백업할 작품이 없습니다.');return;}
+ // Count UTF-16 strings plus JSON/Blob duplication; conservative safety limit on iPad.
+ let chars=2048;
+ for(const w of items){chars+=(w.original?.length||0)+(w.result?.length||0)+JSON.stringify({...w,original:'',result:''}).length+256;}
+ for(const p of presets)chars+=JSON.stringify(p).length+64;
+ const estimate=chars*5; // JSON string, encoded Blob and intermediate copies
+ if(estimate>18*1048576){message('⚠️ 예상 일시 메모리 '+humanBytes(estimate)+'로 안전 기준을 넘었습니다. 전체 백업을 만들지 않았습니다. 작품별 백업을 이용해 주세요.');return;}
+ if(!confirm(kind+' '+items.length+'장과 조합 '+presets.length+'개를 백업 파일로 준비합니다. 예상 일시 메모리 약 '+humanBytes(estimate)+'입니다. 계속할까요?'))return;
+ backupLock(true);
+ try{const size=downloadJson(backupPayload(items,presets),filename);
+  message('📥 '+kind+' 파일 다운로드를 요청했습니다 ('+humanBytes(size)+'). 아직 백업 완료로 간주하지 마세요. 파일 앱에서 파일 존재와 크기를 확인해 주세요.');
+ }catch(e){message('⚠️ 백업 파일 준비 실패 ('+(e?.name||'오류')+'). 기존 작품은 변경하지 않았습니다.');}
+ finally{backupLock(false);}
+}
+$('backup').onclick=async()=>{
+ if(backingUp)return;
+ try{
+  // Do not call getAll solely for backup: inspect existing in-memory gallery first.
+  const items=works.slice();
+  if(!items.length){message('⚠️ 보관된 작품이 없습니다.');return;}
+  await exportBackup(items,'AI_마법변신_전체백업_'+new Date().toISOString().slice(0,10)+'.json','전체');
+ }catch(e){message('⚠️ 전체 백업을 준비하지 못했습니다. 개별 백업을 이용해 주세요.');}
+};
+$('backupOne').onclick=async()=>{
+ if(backingUp)return;
+ if(!active){message('먼저 ④ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}
+ try{const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
+ const safeName=(w.name||'작품').replace(/[\\/:*?"<>|]/g,'_').slice(0,35);
+ await exportBackup([w],'AI_마법변신_개별백업_'+safeName+'_'+new Date().toISOString().slice(0,10)+'.json','개별');
+ }catch(e){message('⚠️ 개별 백업을 준비하지 못했습니다.');}
+};
 
 function validRecord(w){return w&&typeof w==='object'&&!Array.isArray(w)&&typeof w.id==='string'&&w.id.length>0&&w.id.length<=180&&typeof w.original==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.original)&&typeof w.result==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.result)&&(!w.parentId||typeof w.parentId==='string');}
-$('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-ai-lab'||!Array.isArray(o.items)||o.items.length>2000)throw Error('파일 형식이 맞지 않습니다.');if(!o.items.every(validRecord))throw Error('일부 작품 데이터가 올바르지 않아 복원을 중단했습니다.');const ids=new Set((await fetchAll()).map(w=>w.id));let n=0,skip=0;for(const w of o.items){if(ids.has(w.id)){skip++;continue;}await add(w);ids.add(w.id);n++;}let addedPresets=0;if(Array.isArray(o.presets)&&o.presets.length<=50&&o.presets.every(safePreset)){
+$('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;if(f.size>25*1048576){message('⚠️ 복원파일이 25MB를 넘습니다. 이 기기에서 복원을 중단했습니다.');return;}if(!confirm('복원 전 확인: 기존 작품은 유지하고 백업에만 있는 작품을 추가합니다. 저장 공간이 충분한가요?'))return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-ai-lab'||!Array.isArray(o.items)||o.items.length>2000)throw Error('파일 형식이 맞지 않습니다.');if(!o.items.every(validRecord))throw Error('일부 작품 데이터가 올바르지 않아 복원을 중단했습니다.');const ids=new Set((await fetchAll()).map(w=>w.id));let n=0,skip=0;for(const w of o.items){if(ids.has(w.id)){skip++;continue;}await add(w);ids.add(w.id);n++;}let addedPresets=0;if(Array.isArray(o.presets)&&o.presets.length<=50&&o.presets.every(safePreset)){
  const known=new Set(presets.map(p=>p.id));const additions=o.presets.filter(p=>!known.has(p.id)).slice(0,Math.max(0,50-presets.length));
  try{if(!presetReady)throw Error('조합 저장소 사용 불가');await persistPresets([...presets,...additions]);addedPresets=additions.length;}catch(e){/* works restoration remains successful */}
  }await refresh();message('✅ '+n+'개 작품을 추가 복원했습니다. 기존 작품과 중복 '+skip+'개는 변경하지 않았습니다. 조합 '+addedPresets+'개 추가.');}catch(err){await refresh().catch(()=>{});message('⚠️ 복원 중단: '+err.message+' 기존 작품은 유지됩니다. 일부 새 작품은 복원되었을 수 있습니다.');}};
