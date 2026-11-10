@@ -1,4 +1,4 @@
-/* MASTER C1.4.6 — safe before/after comparison. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.7 — coherent background/action/expression/outfit prompts. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -21,11 +21,12 @@ function composeScene(s,pose){
   const action=pose.includes('앉')?'편안하게 앉아 있는 장면':pose.includes('서서')?'자연스럽게 서 있는 장면':pose.includes('달리')?'즐겁게 달리는 장면':pose.includes('인사')?'손을 흔들며 인사하는 장면':pose.includes('꽃을')?'꽃을 들고 있는 장면':'선택한 자세를 취한 장면';
   return `${place}에서 ${action}. 기존 장면에 포함된 뛰기·헤엄치기·날기 등의 동작이 선택한 자세와 충돌하면 선택한 자세를 우선하고 충돌하는 동작은 제거해 주세요.`;
 }
-function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(selected);$('scenes').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.id===selected));$('sceneDesc').textContent=s.desc;
+function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(selected);$('scenes').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.id===selected));
   if(updateMeta)$('resultScene').value=selected;
   const expression=$('expressionChoice').value,pose=$('poseChoice').value,clothes=$('clothesChoice').value;
   const scene=composeScene(s,pose);
-  $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여 고품질의 사실적인 창작사진 한 장을 만들어 주세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[선택 우선순위] 사용자가 직접 선택한 표정·자세·의상이 장면 기본 설명과 충돌하면 직접 선택한 항목을 우선합니다. 선택하지 않은 항목은 장면 기본값을 사용합니다. 장면의 배경과 분위기는 유지하되 모순되는 동작을 동시에 표현하지 마세요.\n[얼굴 보존] 원본 아이의 얼굴형, 눈·코·입 비율, 헤어라인, 실제 나이에 맞는 특징과 자연스러운 피부 질감을 최대한 충실하게 유지하세요. 다른 아이처럼 바꾸거나 과도한 미화·나이 변경을 하지 마세요.\n[신체 정확성] 인물은 한 명만 등장합니다. 팔 두 개, 손 두 개, 다리 두 개, 발 두 개만 있어야 합니다. 양팔은 각각 어깨에서 팔꿈치·손목·손까지 연결되고, 손가락은 각 손에 자연스럽게 다섯 개씩 연결되도록 해 주세요. 손을 겹치거나 가리는 경우에도 추가 손·팔이 생기지 않게 하고, 소품을 쥔 손과 쉬는 손을 혼동하지 마세요. 불가능한 관절 각도와 중복된 신체 부위를 피하세요.\n[자세와 구도] 선택한 자세가 해부학적으로 자연스럽게 보이도록 몸통·골반·다리의 무게 중심, 손의 위치, 주변 물체와의 접촉을 맞추세요. 앉은 자세라면 안정적인 지지면을 표현하세요. 원본 얼굴이 선명하게 보이는 인물 중심의 한 장면을 구성하세요.\n[사진 품질] 실제 사진 같은 피부·머리카락·의상 재질, 배경과 일치하는 빛·그림자·원근감. 인물과 배경이 따로 붙은 것처럼 보이지 않게 표현하세요. 문자·워터마크·콜라주·여러 컷은 제외하세요.\n[최종 확인] 생성 전후에 인물 수, 팔·손·다리·발의 개수, 손가락과 관절 연결, 선택한 표정·자세·의상과 장면의 일관성을 점검하고 부자연스러운 부분을 바로잡으세요. 이 사진은 실제 기록이 아닌 상상 속 창작사진입니다.`;
+  $('sceneDesc').textContent=pose ? `선택한 배경에서 ${pose} · 직접 선택한 자세를 우선합니다. (장면의 원래 동작은 적용하지 않음)` : s.desc;
+  $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여 고품질의 사실적인 창작사진 한 장을 만들어 주세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[선택 우선순위] 장면 이름은 배경 선택용 분류명이며 동작 지시가 아닙니다. 사용자가 직접 선택한 표정·자세·의상이 장면 기본 설명과 충돌하면 직접 선택한 항목을 우선합니다. 선택하지 않은 항목은 장면 기본값을 사용합니다. 장면의 배경과 분위기는 유지하되 모순되는 동작을 동시에 표현하지 마세요.\n[얼굴 보존] 원본 아이의 얼굴형, 눈·코·입 비율, 헤어라인, 실제 나이에 맞는 특징과 자연스러운 피부 질감을 최대한 충실하게 유지하세요. 다른 아이처럼 바꾸거나 과도한 미화·나이 변경을 하지 마세요.\n[신체 정확성] 인물은 한 명만 등장합니다. 팔 두 개, 손 두 개, 다리 두 개, 발 두 개만 있어야 합니다. 양팔은 각각 어깨에서 팔꿈치·손목·손까지 연결되고, 손가락은 각 손에 자연스럽게 다섯 개씩 연결되도록 해 주세요. 손을 겹치거나 가리는 경우에도 추가 손·팔이 생기지 않게 하고, 소품을 쥔 손과 쉬는 손을 혼동하지 마세요. 불가능한 관절 각도와 중복된 신체 부위를 피하세요.\n[자세와 구도] 선택한 자세가 해부학적으로 자연스럽게 보이도록 몸통·골반·다리의 무게 중심, 손의 위치, 주변 물체와의 접촉을 맞추세요. 앉은 자세라면 안정적인 지지면을 표현하세요. 원본 얼굴이 선명하게 보이는 인물 중심의 한 장면을 구성하세요.\n[사진 품질] 실제 사진 같은 피부·머리카락·의상 재질, 배경과 일치하는 빛·그림자·원근감. 인물과 배경이 따로 붙은 것처럼 보이지 않게 표현하세요. 문자·워터마크·콜라주·여러 컷은 제외하세요.\n[최종 확인] 생성 전후에 인물 수, 팔·손·다리·발의 개수, 손가락과 관절 연결, 선택한 표정·자세·의상과 장면의 일관성을 점검하고 부자연스러운 부분을 바로잡으세요. 이 사진은 실제 기록이 아닌 상상 속 창작사진입니다.`;
 }
 function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;}
 for(const s of scenes){const b=document.createElement('button');b.type='button';b.textContent=s.name;b.dataset.id=s.id;b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
