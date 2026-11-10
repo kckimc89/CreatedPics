@@ -1,4 +1,5 @@
-/* MASTER C1.4.13 — improved face fidelity, anatomy, pose and lighting prompts. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.14 — memory-safer segmented backup + storage-verified individual backup.
+   Preserves existing IndexedDB names, existing works and presets. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -148,50 +149,70 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
 $('updateInfo').onclick=async()=>{if(!active||!editMode){message('먼저 아래 보관함에서 수정할 작품을 선택해 주세요.');return;}const item=works.find(w=>w.id===active);if(!item){message('수정할 작품을 찾지 못했습니다.');return;}
   const updated={...item,scene:$('resultScene').value,name:$('workTitle').value.trim()||titleFor($('resultScene').value),note:$('workNote').value.trim(),face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore')};try{await put(updated);dirty=false;await refresh();message('✅ 작품 정보만 수정했습니다. 원본·결과 사진과 수정 연결 관계는 유지했습니다.');}catch(e){message('⚠️ 작품 정보 수정에 실패했습니다. 먼저 백업해 주세요.');}};
 $('newWork').onclick=()=>{const parent=repairParent&&works.find(w=>w.id===repairParent);newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
-// C1.4.12: bounded, read-only backup. Existing database names and records stay unchanged.
+// C1.4.14: segmented, read-only backup. Existing database names and records stay unchanged.
 function humanBytes(n){return n>=1048576?(n/1048576).toFixed(1)+'MB':(n/1024).toFixed(0)+'KB';}
-function backupPayload(items,ps){return {format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets:ps};}
-function downloadJson(obj,filename){
- const json=JSON.stringify(obj);const blob=new Blob([json],{type:'application/json'});
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;
- document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
- return blob.size;
+function backupHeader(){return '{"format":"family-creative-ai-lab","version":1,"exportedAt":'+JSON.stringify(new Date().toISOString())+',"items":[';}
+function segmentedBackupBlob(items,ps){
+  // Build the file from small JSON pieces instead of one giant JSON.stringify(payload).
+  // This keeps peak temporary memory close to one work at a time on iPad Safari.
+  const parts=[backupHeader()];
+  for(let i=0;i<items.length;i++){if(i)parts.push(',');parts.push(JSON.stringify(items[i]));}
+  parts.push('],"presets":',JSON.stringify(ps),'}');
+  return new Blob(parts,{type:'application/json'});
+}
+function requestBlobDownload(blob,filename){
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 let backingUp=false;
 function backupLock(on){backingUp=on;$('backup').disabled=on;$('backupOne').disabled=on;}
+function backupStats(items,ps){
+  let totalChars=128,maxWorkChars=0;
+  for(const w of items){
+    const meta=JSON.stringify({...w,original:'',result:''}).length+256;
+    const n=(w.original?.length||0)+(w.result?.length||0)+meta;
+    totalChars+=n;maxWorkChars=Math.max(maxWorkChars,n);
+  }
+  for(const p of ps)totalChars+=JSON.stringify(p).length+64;
+  // Segmented construction only stringifies one work at a time. Estimate temporary peak conservatively.
+  return {fileEstimate:totalChars,peakEstimate:Math.max(1048576,maxWorkChars*3)};
+}
 async function exportBackup(items,filename,kind){
- if(backingUp)return;
- if(!presetReady){message('⚠️ 조합 저장소를 읽지 못했습니다. 불완전한 백업을 만들지 않습니다.');return;}
- if(!items.length){message('⚠️ 백업할 작품이 없습니다.');return;}
- // Count UTF-16 strings plus JSON/Blob duplication; conservative safety limit on iPad.
- let chars=2048;
- for(const w of items){chars+=(w.original?.length||0)+(w.result?.length||0)+JSON.stringify({...w,original:'',result:''}).length+256;}
- for(const p of presets)chars+=JSON.stringify(p).length+64;
- const estimate=chars*5; // JSON string, encoded Blob and intermediate copies
- if(estimate>18*1048576){message('⚠️ 예상 일시 메모리 '+humanBytes(estimate)+'로 안전 기준을 넘었습니다. 전체 백업을 만들지 않았습니다. 작품별 백업을 이용해 주세요.');return;}
- if(!confirm(kind+' '+items.length+'장과 조합 '+presets.length+'개를 백업 파일로 준비합니다. 예상 일시 메모리 약 '+humanBytes(estimate)+'입니다. 계속할까요?'))return;
- backupLock(true);
- try{const size=downloadJson(backupPayload(items,presets),filename);
-  message('📥 '+kind+' 파일 다운로드를 요청했습니다 ('+humanBytes(size)+'). 아직 백업 완료로 간주하지 마세요. 파일 앱에서 파일 존재와 크기를 확인해 주세요.');
- }catch(e){message('⚠️ 백업 파일 준비 실패 ('+(e?.name||'오류')+'). 기존 작품은 변경하지 않았습니다.');}
- finally{backupLock(false);}
+  if(backingUp)return;
+  if(!presetReady){message('⚠️ 조합 저장소를 읽지 못했습니다. 불완전한 백업을 만들지 않습니다.');return;}
+  if(!items.length){message('⚠️ 백업할 작품이 없습니다.');return;}
+  const st=backupStats(items,presets);
+  if(st.fileEstimate>40*1048576||st.peakEstimate>18*1048576){
+    message('⚠️ 백업 예상 크기 '+humanBytes(st.fileEstimate)+' · 순간 메모리 약 '+humanBytes(st.peakEstimate)+'로 안전 기준을 넘었습니다. 작품별 백업을 이용해 주세요.');return;
+  }
+  if(!confirm(kind+' '+items.length+'장과 조합 '+presets.length+'개를 백업합니다. 예상 파일 크기 약 '+humanBytes(st.fileEstimate)+'입니다. 계속할까요?'))return;
+  backupLock(true);
+  try{
+    const blob=segmentedBackupBlob(items,presets);
+    requestBlobDownload(blob,filename);
+    message('📥 '+kind+' 파일 다운로드를 요청했습니다 ('+humanBytes(blob.size)+'). 파일 앱에서 실제 저장과 파일 크기를 확인해 주세요. 기존 작품은 변경하지 않았습니다.');
+  }catch(e){message('⚠️ 백업 파일 준비 실패 ('+(e?.name||'오류')+'). 기존 작품은 변경하지 않았습니다.');}
+  finally{backupLock(false);}
 }
 $('backup').onclick=async()=>{
- if(backingUp)return;
- try{
-  // Do not call getAll solely for backup: inspect existing in-memory gallery first.
-  const items=works.slice();
-  if(!items.length){message('⚠️ 보관된 작품이 없습니다.');return;}
-  await exportBackup(items,'AI_마법변신_전체백업_'+new Date().toISOString().slice(0,10)+'.json','전체');
- }catch(e){message('⚠️ 전체 백업을 준비하지 못했습니다. 개별 백업을 이용해 주세요.');}
+  if(backingUp)return;
+  try{
+    // Read-only: uses the gallery snapshot already loaded from the unchanged works database.
+    const items=works.slice();
+    if(!items.length){message('⚠️ 보관된 작품이 없습니다.');return;}
+    await exportBackup(items,'AI_마법변신_전체백업_'+new Date().toISOString().slice(0,10)+'.json','전체');
+  }catch(e){message('⚠️ 전체 백업을 준비하지 못했습니다. 개별 백업을 이용해 주세요.');}
 };
 $('backupOne').onclick=async()=>{
- if(backingUp)return;
- if(!active){message('먼저 ④ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}
- try{const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
- const safeName=(w.name||'작품').replace(/[\\/:*?"<>|]/g,'_').slice(0,35);
- await exportBackup([w],'AI_마법변신_개별백업_'+safeName+'_'+new Date().toISOString().slice(0,10)+'.json','개별');
- }catch(e){message('⚠️ 개별 백업을 준비하지 못했습니다.');}
+  if(backingUp)return;
+  if(!active){message('먼저 ④ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}
+  try{
+    // Re-read the selected record from IndexedDB so the exported item is verified against storage.
+    const w=await fetchOne(active);
+    if(!w||!validRecord(w)){message('⚠️ 선택한 작품을 저장소에서 정상적으로 읽지 못해 백업을 중단했습니다.');return;}
+    const safeName=(w.name||'작품').replace(/[\\/:*?"<>|]/g,'_').slice(0,35);
+    await exportBackup([w],'AI_마법변신_개별백업_'+safeName+'_'+new Date().toISOString().slice(0,10)+'.json','개별');
+  }catch(e){message('⚠️ 개별 백업을 준비하지 못했습니다.');}
 };
 
 function validRecord(w){return w&&typeof w==='object'&&!Array.isArray(w)&&typeof w.id==='string'&&w.id.length>0&&w.id.length<=180&&typeof w.original==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.original)&&typeof w.result==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.result)&&(!w.parentId||typeof w.parentId==='string');}
