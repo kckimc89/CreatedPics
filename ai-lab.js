@@ -1,4 +1,4 @@
-/* MASTER C1.4.7 — coherent background/action/expression/outfit prompts. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.8 — coherent background/action/expression/outfit prompts. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -26,7 +26,7 @@ function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(s
   const expression=$('expressionChoice').value,pose=$('poseChoice').value,clothes=$('clothesChoice').value;
   const scene=composeScene(s,pose);
   $('sceneDesc').textContent=pose ? `선택한 배경에서 ${pose} · 직접 선택한 자세를 우선합니다. (장면의 원래 동작은 적용하지 않음)` : s.desc;
-  $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여 고품질의 사실적인 창작사진 한 장을 만들어 주세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[선택 우선순위] 장면 이름은 배경 선택용 분류명이며 동작 지시가 아닙니다. 사용자가 직접 선택한 표정·자세·의상이 장면 기본 설명과 충돌하면 직접 선택한 항목을 우선합니다. 선택하지 않은 항목은 장면 기본값을 사용합니다. 장면의 배경과 분위기는 유지하되 모순되는 동작을 동시에 표현하지 마세요.\n[얼굴 보존] 원본 아이의 얼굴형, 눈·코·입 비율, 헤어라인, 실제 나이에 맞는 특징과 자연스러운 피부 질감을 최대한 충실하게 유지하세요. 다른 아이처럼 바꾸거나 과도한 미화·나이 변경을 하지 마세요.\n[신체 정확성] 인물은 한 명만 등장합니다. 팔 두 개, 손 두 개, 다리 두 개, 발 두 개만 있어야 합니다. 양팔은 각각 어깨에서 팔꿈치·손목·손까지 연결되고, 손가락은 각 손에 자연스럽게 다섯 개씩 연결되도록 해 주세요. 손을 겹치거나 가리는 경우에도 추가 손·팔이 생기지 않게 하고, 소품을 쥔 손과 쉬는 손을 혼동하지 마세요. 불가능한 관절 각도와 중복된 신체 부위를 피하세요.\n[자세와 구도] 선택한 자세가 해부학적으로 자연스럽게 보이도록 몸통·골반·다리의 무게 중심, 손의 위치, 주변 물체와의 접촉을 맞추세요. 앉은 자세라면 안정적인 지지면을 표현하세요. 원본 얼굴이 선명하게 보이는 인물 중심의 한 장면을 구성하세요.\n[사진 품질] 실제 사진 같은 피부·머리카락·의상 재질, 배경과 일치하는 빛·그림자·원근감. 인물과 배경이 따로 붙은 것처럼 보이지 않게 표현하세요. 문자·워터마크·콜라주·여러 컷은 제외하세요.\n[최종 확인] 생성 전후에 인물 수, 팔·손·다리·발의 개수, 손가락과 관절 연결, 선택한 표정·자세·의상과 장면의 일관성을 점검하고 부자연스러운 부분을 바로잡으세요. 이 사진은 실제 기록이 아닌 상상 속 창작사진입니다.`;
+  $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여 고품질의 사실적인 창작사진 한 장을 만들어 주세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[선택 우선순위] 장면 이름은 배경 선택용 분류명이며 동작 지시가 아닙니다. 사용자가 직접 선택한 표정·자세·의상이 장면 기본 설명과 충돌하면 직접 선택한 항목을 우선합니다. 선택하지 않은 항목은 장면 기본값을 사용합니다. 장면의 배경과 분위기는 유지하되 모순되는 동작을 동시에 표현하지 마세요.\n[얼굴 보존] 원본 아이의 얼굴형, 눈·코·입 비율, 헤어라인, 실제 나이에 맞는 특징과 자연스러운 피부 질감을 최대한 충실하게 유지하세요. 다른 아이처럼 바꾸거나 과도한 미화·나이 변경을 하지 마세요.\n[손과 발의 배치] 사진에 실제로 보이는 팔과 손의 연결을 먼저 계획하고, 소품을 쥔 손과 다른 손의 위치를 구분하세요. 손이 가려지는 경우 가려진 손을 새로 추가하지 마세요. 신체 부위가 중복되지 않도록 주의하세요.\n[신체 정확성] 인물은 한 명만 등장합니다. 팔 두 개, 손 두 개, 다리 두 개, 발 두 개만 있어야 합니다. 양팔은 각각 어깨에서 팔꿈치·손목·손까지 연결되고, 손가락은 각 손에 자연스럽게 다섯 개씩 연결되도록 해 주세요. 손을 겹치거나 가리는 경우에도 추가 손·팔이 생기지 않게 하고, 소품을 쥔 손과 쉬는 손을 혼동하지 마세요. 불가능한 관절 각도와 중복된 신체 부위를 피하세요.\n[자세와 구도] 선택한 자세가 해부학적으로 자연스럽게 보이도록 몸통·골반·다리의 무게 중심, 손의 위치, 주변 물체와의 접촉을 맞추세요. 앉은 자세라면 안정적인 지지면을 표현하세요. 원본 얼굴이 선명하게 보이는 인물 중심의 한 장면을 구성하세요.\n[사진 품질] 실제 사진 같은 피부·머리카락·의상 재질, 배경과 일치하는 빛·그림자·원근감. 인물과 배경이 따로 붙은 것처럼 보이지 않게 표현하세요. 문자·워터마크·콜라주·여러 컷은 제외하세요.\n[최종 확인] 생성 전후에 인물 수, 팔·손·다리·발의 개수, 손가락과 관절 연결, 선택한 표정·자세·의상과 장면의 일관성을 점검하고 부자연스러운 부분을 바로잡으세요. 이 사진은 실제 기록이 아닌 상상 속 창작사진입니다.`;
 }
 function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;}
 for(const s of scenes){const b=document.createElement('button');b.type='button';b.textContent=s.name;b.dataset.id=s.id;b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
@@ -34,6 +34,40 @@ $('resultScene').onchange=()=>selectScene($('resultScene').value);
 for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).addEventListener('change',()=>displayScene(selected,false));
 $('resetChoices').onclick=()=>{for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).value='';displayScene(selected,false);};
 displayScene('castle',true);setTitleForScene('castle');
+// C1.4.8: Independent small preference store. Never modify the existing works database.
+const presetKey='family-creative-ai-lab-presets-c148';
+const choiceIds=['expressionChoice','poseChoice','clothesChoice'];
+let presets=[];
+function safePreset(p){
+  return p&&typeof p==='object'&&!Array.isArray(p)&&typeof p.id==='string'&&p.id.length<=120&&typeof p.name==='string'&&p.name.length<=40&&scenes.some(s=>s.id===p.scene)&&choiceIds.every(id=>typeof p[id]==='string'&&[...$(id).options].some(o=>o.value===p[id]));
+}
+function readPresets(){try{const raw=JSON.parse(localStorage.getItem(presetKey)||'[]');return Array.isArray(raw)?raw.filter(safePreset).slice(0,50):[];}catch(e){return [];}}
+function persistPresets(next){localStorage.setItem(presetKey,JSON.stringify(next));presets=next;renderPresets();}
+function renderPresets(selectedId=''){
+ const sel=$('presetList');sel.replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='저장한 조합 선택';sel.append(placeholder);
+ for(const p of presets){const o=document.createElement('option');o.value=p.id;o.textContent=p.name+' · '+sceneFor(p.scene).name;sel.append(o);}
+ if(presets.some(p=>p.id===selectedId))sel.value=selectedId;
+ $('presetStatus').textContent=presets.length+'개 조합 저장됨 · 이 기기의 브라우저에 보관됩니다. 전체 백업에도 포함됩니다.';
+}
+function presetMessage(t){$('presetStatus').textContent=t;}
+presets=readPresets();renderPresets();
+$('savePreset').onclick=()=>{
+ const name=$('presetName').value.trim();if(!name){presetMessage('⚠️ 조합 이름을 입력해 주세요.');return;}
+ if(presets.length>=50){presetMessage('⚠️ 조합은 최대 50개까지 저장할 수 있습니다.');return;}
+ const p={id:'preset-'+Date.now()+'-'+Math.random().toString(36).slice(2),name,scene:selected,...Object.fromEntries(choiceIds.map(id=>[id,$(id).value]))};
+ try{persistPresets([...presets,p]);$('presetList').value=p.id;presetMessage('✅ '+name+' 조합을 저장했습니다. 기존 작품에는 영향을 주지 않습니다.');}catch(e){presetMessage('⚠️ 저장 공간 또는 브라우저 설정 때문에 조합을 저장하지 못했습니다.');}
+};
+$('loadPreset').onclick=()=>{
+ const p=presets.find(p=>p.id===$('presetList').value);if(!p){presetMessage('먼저 저장한 조합을 선택해 주세요.');return;}
+ for(const id of choiceIds)$(id).value=p[id];selectScene(p.scene);$('presetName').value=p.name;displayScene(p.scene,true);
+ presetMessage('✅ '+p.name+' 조합을 요청문에 적용했습니다. 기존 작품 사진은 변경하지 않았습니다.');
+};
+$('deletePreset').onclick=()=>{
+ const p=presets.find(p=>p.id===$('presetList').value);if(!p){presetMessage('삭제할 조합을 선택해 주세요.');return;}
+ if(!confirm('「'+p.name+'」 조합만 삭제할까요? 보관 작품 사진은 삭제되지 않습니다.'))return;
+ try{persistPresets(presets.filter(x=>x.id!==p.id));presetMessage('조합만 삭제했습니다. 보관 작품은 그대로입니다.');}catch(e){presetMessage('⚠️ 조합 삭제를 저장하지 못했습니다.');}
+};
+
 const dbName='family-creative-ai-lab-c140'; // DO NOT rename: retains the C1.4.2 stored works.
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open(dbName,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('works'))r.result.createObjectStore('works',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function transact(mode,act){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('works',mode);let req;try{req=act(tx.objectStore('works'));}catch(e){d.close();reject(e);return;}let value;req.onsuccess=()=>{value=req.result;};tx.oncomplete=()=>{d.close();resolve(value);};tx.onerror=()=>{d.close();reject(tx.error);};tx.onabort=()=>{d.close();reject(tx.error||Error('저장 중단'));};});}
@@ -100,8 +134,11 @@ $('updateInfo').onclick=async()=>{if(!active||!editMode){message('먼저 아래 
   const updated={...item,scene:$('resultScene').value,name:$('workTitle').value.trim()||titleFor($('resultScene').value),note:$('workNote').value.trim(),face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore')};try{await put(updated);dirty=false;await refresh();message('✅ 작품 정보만 수정했습니다. 원본·결과 사진과 수정 연결 관계는 유지했습니다.');}catch(e){message('⚠️ 작품 정보 수정에 실패했습니다. 먼저 백업해 주세요.');}};
 $('newWork').onclick=()=>{const parent=repairParent&&works.find(w=>w.id===repairParent);newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
 function downloadJson(obj,filename){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),25000);}
-$('backup').onclick=async()=>{try{const items=await fetchAll();downloadJson({format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items},'AI_마법변신_시험작품_백업.json');message('✅ 백업 파일 다운로드를 요청했습니다. 파일 앱에서 실제 저장 여부를 확인해 주세요. ('+items.length+'개 작품)');}catch(e){message('⚠️ 백업 파일 생성에 실패했습니다.');}};
+$('backup').onclick=async()=>{try{const items=await fetchAll();downloadJson({format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets},'AI_마법변신_시험작품_백업.json');message('✅ 백업 파일 다운로드를 요청했습니다. 파일 앱에서 실제 저장 여부를 확인해 주세요. ('+items.length+'개 작품)');}catch(e){message('⚠️ 백업 파일 생성에 실패했습니다.');}};
 function validRecord(w){return w&&typeof w==='object'&&!Array.isArray(w)&&typeof w.id==='string'&&w.id.length>0&&w.id.length<=180&&typeof w.original==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.original)&&typeof w.result==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.result)&&(!w.parentId||typeof w.parentId==='string');}
-$('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-ai-lab'||!Array.isArray(o.items)||o.items.length>2000)throw Error('파일 형식이 맞지 않습니다.');if(!o.items.every(validRecord))throw Error('일부 작품 데이터가 올바르지 않아 복원을 중단했습니다.');const ids=new Set((await fetchAll()).map(w=>w.id));let n=0,skip=0;for(const w of o.items){if(ids.has(w.id)){skip++;continue;}await add(w);ids.add(w.id);n++;}await refresh();message('✅ '+n+'개 작품을 추가 복원했습니다. 기존 작품과 중복 '+skip+'개는 변경하지 않았습니다.');}catch(err){await refresh().catch(()=>{});message('⚠️ 복원 중단: '+err.message+' 기존 작품은 유지됩니다. 일부 새 작품은 복원되었을 수 있습니다.');}};
+$('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-ai-lab'||!Array.isArray(o.items)||o.items.length>2000)throw Error('파일 형식이 맞지 않습니다.');if(!o.items.every(validRecord))throw Error('일부 작품 데이터가 올바르지 않아 복원을 중단했습니다.');const ids=new Set((await fetchAll()).map(w=>w.id));let n=0,skip=0;for(const w of o.items){if(ids.has(w.id)){skip++;continue;}await add(w);ids.add(w.id);n++;}let addedPresets=0;if(Array.isArray(o.presets)&&o.presets.length<=50&&o.presets.every(safePreset)){
+ const known=new Set(presets.map(p=>p.id));const additions=o.presets.filter(p=>!known.has(p.id)).slice(0,Math.max(0,50-presets.length));
+ try{persistPresets([...presets,...additions]);addedPresets=additions.length;}catch(e){/* works restoration remains successful */}
+ }await refresh();message('✅ '+n+'개 작품을 추가 복원했습니다. 기존 작품과 중복 '+skip+'개는 변경하지 않았습니다. 조합 '+addedPresets+'개 추가.');}catch(err){await refresh().catch(()=>{});message('⚠️ 복원 중단: '+err.message+' 기존 작품은 유지됩니다. 일부 새 작품은 복원되었을 수 있습니다.');}};
 refresh().catch(()=>message('⚠️ 저장소를 열지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'));
 })();
