@@ -1,4 +1,4 @@
-/* MASTER C1.4.3 — isolated local AI trial. Preserves C1.4.2 IndexedDB and prior works. */
+/* MASTER C1.4.4 — safe before/after comparison. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -34,7 +34,7 @@ function clearRepair(clearParent=true){if(clearParent)repairParent=null;repairPr
 function resetScores(){for(const id of ['face','quality','anatomy','poseScore'])$(id).value='';}
 function newDraft({preserveSource=true,preserveParent=false}={}){
   active=null;editMode=false;dirty=false;result=null;view('resultView',null);if(!preserveSource){source=null;view('originalView',null);}
-  if(!preserveParent)clearRepair();else{$('repairPrompt').value='';repairPromptParent=null;}
+  if(!preserveParent)clearRepair();else{$('repairPrompt').value='';repairPromptParent=null;$('repairCompare').classList.add('hidden');}
   $('workNote').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);
   markSelection();
 }
@@ -44,19 +44,32 @@ $('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value=
 $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;
   }
-  result=data;view('resultView',result);markSelection();message('✅ 새 AI 결과를 가져왔습니다. 평가 후 새 작품으로 저장할 수 있습니다.');
+  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();message('✅ 새 AI 결과를 가져왔습니다. 평가 후 새 작품으로 저장할 수 있습니다.');
 }catch(err){message('⚠️ '+err.message);}};
 async function copyPrompt(id){const t=$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 function download(data,name){if(!data){message('먼저 AI 결과를 불러오세요.');return;}const a=document.createElement('a');a.href=data;a.download=name;a.click();}
 $('downloadResult').onclick=()=>download(result,'AI_마법변신_'+($('workTitle').value.trim()||selected).replace(/[\\/:*?"<>|]/g,'_')+'.jpg');
-const repairPanel=document.createElement('section');repairPanel.className='lab-meta';repairPanel.style.marginTop='14px';repairPanel.innerHTML=`<h3 style="margin:0">🛠️ AI 작품 다시 수정하기 (C1.4.3)</h3><p class="status">보관 작품을 선택한 다음 수정 요청문을 만드세요. 수정 결과는 항상 별도 작품으로 보관합니다.</p><label>수정할 부분<select id="repairType" class="lab-select"><option value="hands">팔·손·손가락 오류</option><option value="face">얼굴 특징 유지</option><option value="expression">표정만 바꾸기</option><option value="clothes">의상만 바꾸기</option><option value="pose">자세만 바꾸기</option><option value="background">배경만 바꾸기</option><option value="custom">직접 입력</option></select></label><label>추가 요청 (선택)<input id="repairDetail" class="lab-select" maxlength="240" placeholder="예: 왼손 손가락을 자연스럽게"></label><div class="lab-actions"><button id="makeRepair" type="button" class="button">🪄 수정 요청문 만들기</button><button id="copyRepair" type="button" class="button">📋 수정 요청문 복사</button></div><textarea id="repairPrompt" class="prompt" readonly placeholder="보관 작품을 선택하고 수정 요청문 만들기를 누르세요."></textarea><div id="repairLineage" class="status">수정 전 작품: 선택되지 않음</div><div class="lab-actions"><button id="compareParent" type="button" class="button">🔎 수정 전후 비교</button></div><div id="repairCompare" class="lab-grid hidden"><div><h3>수정 전 작품</h3><div id="repairBefore" class="photo-box"></div></div><div><h3>수정 후 작품</h3><div id="repairAfter" class="photo-box"></div></div></div><div class="score"><label>손·발 정확성<select id="anatomy" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 정확</option><option value="3">3 · 일부 어색함</option><option value="2">2 · 명확한 오류</option><option value="1">1 · 심각한 오류</option></select></label><label>자세 자연스러움<select id="poseScore" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 자연스러움</option><option value="3">3 · 조금 어색함</option><option value="2">2 · 부자연스러움</option><option value="1">1 · 심각한 오류</option></select></label></div>`;
+const repairPanel=document.createElement('section');repairPanel.className='lab-meta';repairPanel.style.marginTop='14px';repairPanel.innerHTML=`<h3 style="margin:0">🛠️ AI 작품 다시 수정하기 (C1.4.4)</h3><p class="status">보관 작품을 선택한 다음 수정 요청문을 만드세요. 수정 결과는 항상 별도 작품으로 보관합니다.</p><label>수정할 부분<select id="repairType" class="lab-select"><option value="hands">팔·손·손가락 오류</option><option value="face">얼굴 특징 유지</option><option value="expression">표정만 바꾸기</option><option value="clothes">의상만 바꾸기</option><option value="pose">자세만 바꾸기</option><option value="background">배경만 바꾸기</option><option value="custom">직접 입력</option></select></label><label>추가 요청 (선택)<input id="repairDetail" class="lab-select" maxlength="240" placeholder="예: 왼손 손가락을 자연스럽게"></label><div class="lab-actions"><button id="makeRepair" type="button" class="button">🪄 수정 요청문 만들기</button><button id="copyRepair" type="button" class="button">📋 수정 요청문 복사</button></div><textarea id="repairPrompt" class="prompt" readonly placeholder="보관 작품을 선택하고 수정 요청문 만들기를 누르세요."></textarea><div id="repairLineage" class="status">수정 전 작품: 선택되지 않음</div><div class="lab-actions"><button id="compareParent" type="button" class="button">🔎 수정 전후 비교</button></div><div id="repairCompare" class="lab-grid hidden"><div><h3>수정 전 작품</h3><div id="repairBefore" class="photo-box"></div></div><div><h3>수정 후 작품</h3><div id="repairAfter" class="photo-box"></div></div></div><div class="score"><label>손·발 정확성<select id="anatomy" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 정확</option><option value="3">3 · 일부 어색함</option><option value="2">2 · 명확한 오류</option><option value="1">1 · 심각한 오류</option></select></label><label>자세 자연스러움<select id="poseScore" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 자연스러움</option><option value="3">3 · 조금 어색함</option><option value="2">2 · 부자연스러움</option><option value="1">1 · 심각한 오류</option></select></label></div>`;
 $('workNote').closest('.lab-meta').append(repairPanel);
 const repairInstructions={hands:'팔은 정확히 두 개, 손은 정확히 두 개여야 합니다. 중복된 팔·손·손가락을 제거하고 어깨부터 손끝까지 관절과 연결을 자연스럽게 수정해 주세요.',face:'원본 아이의 얼굴형, 눈·코·입의 비율, 나이와 헤어라인을 충실하게 유지하고 달라진 얼굴 특징만 교정해 주세요.',expression:'얼굴의 고유한 특징은 유지하면서 표정만 자연스럽게 바꿔 주세요.',clothes:'아이의 얼굴·자세·배경을 유지하고 의상만 자연스럽게 변경해 주세요.',pose:'아이의 얼굴·의상·배경을 유지하면서 자세만 자연스럽게 변경해 주세요. 신체 구조와 손발 개수를 정확히 지켜 주세요.',background:'아이의 얼굴·표정·의상·자세는 유지하고 배경만 변경해 주세요.',custom:'아래 추가 요청에 적힌 부분만 수정해 주세요.'};
 $('makeRepair').onclick=()=>{const parent=works.find(w=>w.id===active);if(!parent){message('먼저 아래 보관 작품을 선택해 주세요.');return;}repairParent=parent.id;repairPromptParent=parent.id;const type=$('repairType').value,extra=$('repairDetail').value.trim();$('repairPrompt').value='첨부한 AI 창작사진 한 장을 수정해 주세요. 새 인물을 생성하지 마세요.\n\n[수정할 부분] '+repairInstructions[type]+(extra?'\n[추가 요청] '+extra:'')+'\n\n[반드시 유지] 아이의 얼굴 특징과 나이, 헤어스타일, 기존 장면의 조명과 분위기, 변경 대상으로 지정하지 않은 의상·배경·자세는 최대한 유지해 주세요.\n[품질 점검] 팔 2개, 손 2개, 다리 2개, 손가락·관절의 연결과 신체 비율을 확인해 주세요. 불필요한 팔다리·중복 인물·워터마크·문자는 넣지 마세요.\n사진처럼 사실적인 고품질 결과 이미지 한 장을 만들어 주세요.';
-  $('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 결과 이미지를 가져오면 새 작품으로 저장';message('✅ 수정 요청문이 준비되었습니다. ChatGPT에 수정 전 AI 사진을 첨부해 주세요.');};
+  $('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 결과 이미지를 가져오면 새 작품으로 저장';$('repairCompare').classList.add('hidden');message('✅ 수정 요청문이 준비되었습니다. ChatGPT에 수정 전 AI 사진을 첨부해 주세요.');};
 $('copyRepair').onclick=()=>copyPrompt('repairPrompt');
-$('compareParent').onclick=()=>{const child=works.find(w=>w.id===active);const parent=works.find(w=>w.id===(child?.parentId||repairParent));if(!parent){message('비교할 수정 전 작품을 먼저 선택해 주세요.');return;}$('repairCompare').classList.remove('hidden');view('repairBefore',parent.result);view('repairAfter',child?.parentId===parent.id?child.result:result);$('repairCompare').scrollIntoView({block:'nearest',behavior:'smooth'});};
+$('compareParent').onclick=()=>{
+  const child=works.find(w=>w.id===active);
+  const linkedParent=child?.parentId?works.find(w=>w.id===child.parentId):null;
+  const parent=linkedParent||works.find(w=>w.id===repairParent);
+  if(!parent){message('비교할 수정 전 작품을 먼저 선택해 주세요.');return;}
+  // A selected parent is not itself a revised result. Never show it on both sides.
+  const revised=linkedParent?child.result:(!editMode&&repairParent===parent.id?result:null);
+  $('repairCompare').classList.remove('hidden');
+  view('repairBefore',parent.result);
+  view('repairAfter',revised);
+  if(!revised){$('repairAfter').querySelector('span').textContent='수정 후 사진을 아직 가져오지 않았습니다.';message('수정 전 작품만 표시했습니다. 수정한 AI 사진을 ③번에서 가져오면 오른쪽에 표시됩니다.');}
+  else message('수정 전후 작품을 나란히 표시했습니다.');
+  $('repairCompare').scrollIntoView({block:'nearest',behavior:'smooth'});
+};
 function getScore(id){return Number($(id).value)||0;}
 $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message('⚠️ 원본과 새 AI 결과 사진을 모두 선택해 주세요.');return;}if(editMode){message('⚠️ 현재 보관 작품을 보고 있습니다. 「같은 원본으로 새 작품 준비」를 누른 후 새 AI 결과를 가져오세요.');return;}
   saving=true;$('saveResult').disabled=true;const sceneId=$('resultScene').value;const title=$('workTitle').value.trim()||titleFor(sceneId);
