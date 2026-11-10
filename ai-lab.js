@@ -1,4 +1,4 @@
-/* MASTER C1.4.8 — coherent background/action/expression/outfit prompts. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.9 — coherent background/action/expression/outfit prompts. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -34,38 +34,52 @@ $('resultScene').onchange=()=>selectScene($('resultScene').value);
 for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).addEventListener('change',()=>displayScene(selected,false));
 $('resetChoices').onclick=()=>{for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).value='';displayScene(selected,false);};
 displayScene('castle',true);setTitleForScene('castle');
-// C1.4.8: Independent small preference store. Never modify the existing works database.
+// C1.4.9: Separate IndexedDB for presets; never alter the existing works database.
 const presetKey='family-creative-ai-lab-presets-c148';
+const presetDbName='family-creative-ai-lab-presets-c149';
 const choiceIds=['expressionChoice','poseChoice','clothesChoice'];
-let presets=[];
+let presets=[],presetReady=false;
 function safePreset(p){
-  return p&&typeof p==='object'&&!Array.isArray(p)&&typeof p.id==='string'&&p.id.length<=120&&typeof p.name==='string'&&p.name.length<=40&&scenes.some(s=>s.id===p.scene)&&choiceIds.every(id=>typeof p[id]==='string'&&[...$(id).options].some(o=>o.value===p[id]));
+ return p&&typeof p==='object'&&!Array.isArray(p)&&typeof p.id==='string'&&p.id.length<=120&&typeof p.name==='string'&&p.name.length<=40&&scenes.some(s=>s.id===p.scene)&&choiceIds.every(id=>typeof p[id]==='string'&&[...$(id).options].some(o=>o.value===p[id]));
 }
-function readPresets(){try{const raw=JSON.parse(localStorage.getItem(presetKey)||'[]');return Array.isArray(raw)?raw.filter(safePreset).slice(0,50):[];}catch(e){return [];}}
-function persistPresets(next){localStorage.setItem(presetKey,JSON.stringify(next));presets=next;renderPresets();}
+function presetDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(presetDbName,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('presets'))r.result.createObjectStore('presets',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('조합 저장소가 다른 탭에서 사용 중입니다.'));});}
+async function readPresetsDb(){const d=await presetDb();try{return await new Promise((resolve,reject)=>{const tx=d.transaction('presets','readonly');const r=tx.objectStore('presets').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}finally{d.close();}}
+async function persistPresets(next){
+ const d=await presetDb();try{await new Promise((resolve,reject)=>{const tx=d.transaction('presets','readwrite');const store=tx.objectStore('presets');store.clear();for(const p of next)store.put(p);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('조합 저장 실패'));tx.onabort=()=>reject(tx.error||Error('조합 저장 중단'));});}finally{d.close();}
+ presets=next;renderPresets();
+}
 function renderPresets(selectedId=''){
  const sel=$('presetList');sel.replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='저장한 조합 선택';sel.append(placeholder);
  for(const p of presets){const o=document.createElement('option');o.value=p.id;o.textContent=p.name+' · '+sceneFor(p.scene).name;sel.append(o);}
  if(presets.some(p=>p.id===selectedId))sel.value=selectedId;
- $('presetStatus').textContent=presets.length+'개 조합 저장됨 · 이 기기의 브라우저에 보관됩니다. 전체 백업에도 포함됩니다.';
+ $('presetStatus').textContent=presets.length+'개 조합 저장됨 · 이 기기의 별도 저장소에 보관됩니다. 전체 백업에도 포함됩니다.';
 }
 function presetMessage(t){$('presetStatus').textContent=t;}
-presets=readPresets();renderPresets();
-$('savePreset').onclick=()=>{
+async function initPresets(){
+ try{
+  let stored=(await readPresetsDb()).filter(safePreset).slice(0,50);
+  // One-time, non-destructive import from C1.4.8 if it is readable.
+  try{const old=JSON.parse(localStorage.getItem(presetKey)||'[]');if(Array.isArray(old)){const ids=new Set(stored.map(p=>p.id));const extra=old.filter(safePreset).filter(p=>!ids.has(p.id)).slice(0,50-stored.length);if(extra.length){stored=[...stored,...extra];await persistPresets(stored);}}}catch(e){/* localStorage may be unavailable; independent DB remains usable */}
+  presets=stored;presetReady=true;renderPresets();
+ }catch(e){presetReady=false;presetMessage('⚠️ 조합 저장소를 열지 못했습니다: '+(e?.name||e?.message||'알 수 없는 오류')+' · 작품 저장소는 변경하지 않았습니다.');}
+}
+renderPresets();initPresets();
+$('savePreset').onclick=async()=>{
+ if(!presetReady){presetMessage('⚠️ 조합 저장소를 사용할 수 없습니다. Safari 일반 탭에서 다시 열어 주세요.');return;}
  const name=$('presetName').value.trim();if(!name){presetMessage('⚠️ 조합 이름을 입력해 주세요.');return;}
  if(presets.length>=50){presetMessage('⚠️ 조합은 최대 50개까지 저장할 수 있습니다.');return;}
  const p={id:'preset-'+Date.now()+'-'+Math.random().toString(36).slice(2),name,scene:selected,...Object.fromEntries(choiceIds.map(id=>[id,$(id).value]))};
- try{persistPresets([...presets,p]);$('presetList').value=p.id;presetMessage('✅ '+name+' 조합을 저장했습니다. 기존 작품에는 영향을 주지 않습니다.');}catch(e){presetMessage('⚠️ 저장 공간 또는 브라우저 설정 때문에 조합을 저장하지 못했습니다.');}
+ try{await persistPresets([...presets,p]);$('presetList').value=p.id;presetMessage('✅ '+name+' 조합을 저장했습니다. 기존 작품에는 영향을 주지 않습니다.');}catch(e){presetMessage('⚠️ 조합 저장 실패 ('+(e?.name||'오류')+'). 기존 작품은 그대로입니다.');}
 };
 $('loadPreset').onclick=()=>{
  const p=presets.find(p=>p.id===$('presetList').value);if(!p){presetMessage('먼저 저장한 조합을 선택해 주세요.');return;}
  for(const id of choiceIds)$(id).value=p[id];selectScene(p.scene);$('presetName').value=p.name;displayScene(p.scene,true);
  presetMessage('✅ '+p.name+' 조합을 요청문에 적용했습니다. 기존 작품 사진은 변경하지 않았습니다.');
 };
-$('deletePreset').onclick=()=>{
+$('deletePreset').onclick=async()=>{
  const p=presets.find(p=>p.id===$('presetList').value);if(!p){presetMessage('삭제할 조합을 선택해 주세요.');return;}
  if(!confirm('「'+p.name+'」 조합만 삭제할까요? 보관 작품 사진은 삭제되지 않습니다.'))return;
- try{persistPresets(presets.filter(x=>x.id!==p.id));presetMessage('조합만 삭제했습니다. 보관 작품은 그대로입니다.');}catch(e){presetMessage('⚠️ 조합 삭제를 저장하지 못했습니다.');}
+ try{await persistPresets(presets.filter(x=>x.id!==p.id));presetMessage('조합만 삭제했습니다. 보관 작품은 그대로입니다.');}catch(e){presetMessage('⚠️ 조합 삭제를 저장하지 못했습니다 ('+(e?.name||'오류')+').');}
 };
 
 const dbName='family-creative-ai-lab-c140'; // DO NOT rename: retains the C1.4.2 stored works.
@@ -134,11 +148,11 @@ $('updateInfo').onclick=async()=>{if(!active||!editMode){message('먼저 아래 
   const updated={...item,scene:$('resultScene').value,name:$('workTitle').value.trim()||titleFor($('resultScene').value),note:$('workNote').value.trim(),face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore')};try{await put(updated);dirty=false;await refresh();message('✅ 작품 정보만 수정했습니다. 원본·결과 사진과 수정 연결 관계는 유지했습니다.');}catch(e){message('⚠️ 작품 정보 수정에 실패했습니다. 먼저 백업해 주세요.');}};
 $('newWork').onclick=()=>{const parent=repairParent&&works.find(w=>w.id===repairParent);newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
 function downloadJson(obj,filename){const blob=new Blob([JSON.stringify(obj)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),25000);}
-$('backup').onclick=async()=>{try{const items=await fetchAll();downloadJson({format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets},'AI_마법변신_시험작품_백업.json');message('✅ 백업 파일 다운로드를 요청했습니다. 파일 앱에서 실제 저장 여부를 확인해 주세요. ('+items.length+'개 작품)');}catch(e){message('⚠️ 백업 파일 생성에 실패했습니다.');}};
+$('backup').onclick=async()=>{try{if(!presetReady)throw Error('조합 저장소를 확인할 수 없어 전체 백업을 중단했습니다.');const items=await fetchAll();downloadJson({format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets},'AI_마법변신_시험작품_백업.json');message('✅ 백업 파일 다운로드를 요청했습니다. 파일 앱에서 실제 저장 여부를 확인해 주세요. ('+items.length+'개 작품)');}catch(e){message('⚠️ 백업 파일 생성에 실패했습니다.');}};
 function validRecord(w){return w&&typeof w==='object'&&!Array.isArray(w)&&typeof w.id==='string'&&w.id.length>0&&w.id.length<=180&&typeof w.original==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.original)&&typeof w.result==='string'&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(w.result)&&(!w.parentId||typeof w.parentId==='string');}
 $('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='family-creative-ai-lab'||!Array.isArray(o.items)||o.items.length>2000)throw Error('파일 형식이 맞지 않습니다.');if(!o.items.every(validRecord))throw Error('일부 작품 데이터가 올바르지 않아 복원을 중단했습니다.');const ids=new Set((await fetchAll()).map(w=>w.id));let n=0,skip=0;for(const w of o.items){if(ids.has(w.id)){skip++;continue;}await add(w);ids.add(w.id);n++;}let addedPresets=0;if(Array.isArray(o.presets)&&o.presets.length<=50&&o.presets.every(safePreset)){
  const known=new Set(presets.map(p=>p.id));const additions=o.presets.filter(p=>!known.has(p.id)).slice(0,Math.max(0,50-presets.length));
- try{persistPresets([...presets,...additions]);addedPresets=additions.length;}catch(e){/* works restoration remains successful */}
+ try{if(!presetReady)throw Error('조합 저장소 사용 불가');await persistPresets([...presets,...additions]);addedPresets=additions.length;}catch(e){/* works restoration remains successful */}
  }await refresh();message('✅ '+n+'개 작품을 추가 복원했습니다. 기존 작품과 중복 '+skip+'개는 변경하지 않았습니다. 조합 '+addedPresets+'개 추가.');}catch(err){await refresh().catch(()=>{});message('⚠️ 복원 중단: '+err.message+' 기존 작품은 유지됩니다. 일부 새 작품은 복원되었을 수 있습니다.');}};
 refresh().catch(()=>message('⚠️ 저장소를 열지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'));
 })();
