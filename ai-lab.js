@@ -1,4 +1,4 @@
-/* MASTER C1.4.12 — improved face fidelity, anatomy, pose and lighting prompts. Preserves existing IndexedDB and prior works. */
+/* MASTER C1.4.13 — improved face fidelity, anatomy, pose and lighting prompts. Preserves existing IndexedDB and prior works. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
@@ -86,6 +86,7 @@ const dbName='family-creative-ai-lab-c140'; // DO NOT rename: retains the C1.4.2
 function db(){return new Promise((resolve,reject)=>{const r=indexedDB.open(dbName,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('works'))r.result.createObjectStore('works',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function transact(mode,act){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('works',mode);let req;try{req=act(tx.objectStore('works'));}catch(e){d.close();reject(e);return;}let value;req.onsuccess=()=>{value=req.result;};tx.oncomplete=()=>{d.close();resolve(value);};tx.onerror=()=>{d.close();reject(tx.error);};tx.onabort=()=>{d.close();reject(tx.error||Error('저장 중단'));};});}
 const fetchAll=()=>transact('readonly',s=>s.getAll());
+const fetchOne=id=>transact('readonly',s=>s.get(id)); // Read only the selected record for individual export.
 const put=item=>transact('readwrite',s=>s.put(item));
 const add=item=>transact('readwrite',s=>s.add(item));
 function view(id,data){const el=$(id);el.replaceChildren();if(!data){const sp=document.createElement('span');sp.textContent='사진을 선택해 주세요';el.append(sp);return;}const img=new Image();img.alt=id==='originalView'?'원본 아이 사진':'AI로 만든 시험 결과';img.src=data;el.append(img);}
