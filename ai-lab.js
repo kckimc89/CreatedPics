@@ -202,16 +202,17 @@ function storyPrompt(){if(!storyItems.length)return '';return '\n\n[아이와 �
 function parentExtraPrompt(){const t=$('parentExtra')?.value.trim()||'';return t?'\n\n[부모 추가 요청]\n'+t+'\n위 추가 요청은 아이의 확정된 선택과 충돌하지 않는 범위에서 반영해 주세요. 충돌한다면 창작 대화에서 짧게 확인해 주세요.':'';}
 function getStudioPrompt(){return '[새 창작 작업 시작] 이전에 만든 이미지나 다른 인물의 사진은 이번 작품의 참고로 사용하지 마세요. 이번 메시지에 새로 첨부하는 원본 사진만 인물 참고로 사용하세요.\n\n'+$('prompt').value+storyPrompt()+parentExtraPrompt();}
 function updateFinalPrompt(){if($('finalPrompt'))$('finalPrompt').value=getStudioPrompt();}
-function openStudioChat(){
+function openStudioChatOnce(){
   const url=studioChatUrl||'https://chatgpt.com/';
-  // iPad Safari may ignore named-window reuse for cross-site navigation.
-  // Use the current tab so repeated creations never accumulate Safari tabs.
-  window.location.assign(url);
+  const w=window.open(url,'_blank');
+  if(!w){message('⚠️ GPT 탭을 열지 못했습니다. Safari의 팝업 허용 상태를 확인해 주세요.');return false;}
+  message('✅ GPT 창작방을 새 탭에 열었습니다. 이 탭과 GPT 탭 두 개를 그대로 두고 사용하세요.');
   return true;
 }
 renderStory();
 if($('parentExtra'))$('parentExtra').addEventListener('input',updateFinalPrompt);
-if($('openChatParent'))$('openChatParent').onclick=()=>{openStudioChat();};
+if($('openChatParent'))$('openChatParent').onclick=()=>{if(confirm('GPT 창작방 탭이 이미 열려 있나요?\n\n이미 열려 있다면 취소를 누르고 기존 GPT 탭으로 이동하세요.\n처음 여는 경우에만 확인을 누르세요.'))openStudioChatOnce();};
+if($('openChatOnce'))$('openChatOnce').onclick=()=>{if(confirm('GPT 창작방 탭이 이미 열려 있나요?\n\n이미 열려 있다면 취소를 누르고 기존 GPT 탭으로 이동하세요.\n처음 여는 경우에만 확인을 누르세요.'))openStudioChatOnce();};
 updateFinalPrompt();
 
 async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 최종 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){const target=id==='prompt'&&$('finalPrompt')?$('finalPrompt'):$(id);target.value=t;target.focus();target.select();message('최종 요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
@@ -225,9 +226,10 @@ $('createInChatGPT').onclick=async()=>{
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
- if(copied)message('✅ 요청문을 준비했습니다. 같은 탭에서 ChatGPT 창작방으로 이동합니다. 완성 후 Safari의 〈 뒤로가기로 스튜디오에 돌아오세요.');
- else message('⚠️ 자동 복사가 되지 않았습니다. 부모용 요청문에서 먼저 복사해 주세요.');
- setTimeout(openStudioChat,80);
+ if(copied){
+   message('✅ 창작 요청을 복사했습니다. 이제 Safari의 GPT 탭으로 이동해 원본사진을 넣고 붙여넣어 보내세요.');
+   if($('twoTabStatus'))$('twoTabStatus').innerHTML='<b>✅ 요청문이 복사되었습니다.</b> 이제 기존 GPT 탭으로 이동하세요. 새 GPT 탭을 열 필요는 없습니다.';
+ }else message('⚠️ 자동 복사가 되지 않았습니다. 부모용 요청문에서 먼저 복사해 주세요.');
 };
 function showReturnHelper(){
  let waiting=false;try{waiting=sessionStorage.getItem('creativeStudioAwaitingResult')==='1';}catch(_){}
@@ -291,7 +293,7 @@ $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message(
   const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(parentId?{parentId}:{})};
   try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();message('✅ '+title+' 작품을 새로 보관했습니다. 기존 작품은 그대로 유지됩니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
 };
-function selectWork(w){active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);
+function selectWork(w){for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);
   if(w.parentId){const parent=works.find(p=>p.id===w.parentId);$('repairLineage').textContent='수정 전 작품: '+(parent?.name||'백업에 없는 작품')+' (수정 관계 기록됨)';}
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
   markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
@@ -301,9 +303,10 @@ function showVoiceEdit(w,card){
  repairParent=w.id;repairPromptParent=w.id;
  for(const e of document.querySelectorAll('.modify-panel'))e.remove();
  const p=document.createElement('section');p.className='modify-panel';
- p.innerHTML='<h3>🎤 어떻게 고칠까요?</h3><p class="status">완성된 작품을 GPT 대화방에 첨부한 다음, 말로 정리한 수정 요청을 붙여넣어 주세요.</p><textarea class="talk-input" rows="3" placeholder="예: 머리를 두 갈래로 묶고, 손을 아이 손처럼 자연스럽게 고쳐줘"></textarea><div class="talk-controls"><button type="button" class="button mod-big" data-do="speak">🎤 말하기</button><button type="button" class="button strong mod-big" data-do="go">✨ GPT에서 고치기</button></div><p class="status" data-note>말하기가 안 되면 입력칸에서 키보드 🎤 받아쓰기를 사용하세요.</p>';
+ p.innerHTML='<div class="modify-head"><h3>🎤 어떻게 고칠까요?</h3><button type="button" class="modify-close" data-do="close" aria-label="수정창 닫기">×</button></div><p class="status">완성된 작품을 GPT 대화방에 첨부한 다음, 말로 정리한 수정 요청을 붙여넣어 주세요.</p><textarea class="talk-input" rows="3" placeholder="예: 머리를 두 갈래로 묶고, 손을 아이 손처럼 자연스럽게 고쳐줘"></textarea><div class="talk-controls"><button type="button" class="button mod-big" data-do="speak">🎤 말하기</button><button type="button" class="button strong mod-big" data-do="go">📋 수정 요청 준비</button></div><p class="status" data-note>말하기가 안 되면 입력칸에서 키보드 🎤 받아쓰기를 사용하세요.</p>';
  card.append(p);
  const input=p.querySelector('textarea'),note=p.querySelector('[data-note]');
+ p.querySelector('[data-do="close"]').onclick=()=>p.remove();
  p.querySelector('[data-do="speak"]').onclick=()=>{if(!SpeechApi){input.focus();note.textContent='키보드의 🎤 받아쓰기를 사용해 주세요.';return;}try{const r=new SpeechApi();r.lang='ko-KR';r.onresult=e=>{input.value=(input.value+' '+e.results[0][0].transcript).trim();note.textContent='✅ 말한 내용을 확인한 뒤 GPT에서 고치기를 눌러 주세요.';};r.onerror=()=>note.textContent='음성 인식이 안 됩니다. 키보드 받아쓰기를 이용해 주세요.';r.start();}catch(e){input.focus();}};
  p.querySelector('[data-do="go"]').onclick=async()=>{
  const t=input.value.trim();if(!t){note.textContent='먼저 고치고 싶은 점을 말해 주세요.';return;}
@@ -311,11 +314,11 @@ function showVoiceEdit(w,card){
  const req='첨부한 AI 창작사진 한 장을 수정해 주세요. 새 인물을 만들지 마세요.\n\n[아이가 원하는 수정]\n'+parts+'\n\n[반드시 유지] 동일 인물의 얼굴 특징·나이, 변경 대상으로 지정하지 않은 자세·의상·배경·조명은 최대한 유지하세요. 팔·손·다리 수와 관절 연결을 자연스럽게 확인하세요. 불필요한 인물·워터마크·문자는 넣지 마세요. 사진처럼 사실적인 결과 이미지 한 장을 만들어 주세요.';
  try{await navigator.clipboard.writeText(req);note.textContent='✅ 수정 요청을 복사했어요. GPT에 현재 완성사진을 첨부하고 붙여넣어 보내세요.';}catch(e){note.textContent='복사가 막혔습니다. 아래 요청문을 길게 눌러 복사하세요.';const ta=document.createElement('textarea');ta.className='talk-input';ta.readOnly=true;ta.value=req;p.append(ta);}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(e){}
- openStudioChat();
+ note.textContent='✅ 수정 요청을 준비했습니다. 이제 기존 GPT 탭으로 이동해 현재 완성사진을 첨부하고 붙여넣어 보내세요.';
  };
 }
 
-async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 저장·백업·삭제 메뉴가 나타납니다.`;$('works').replaceChildren();
+async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 관리 메뉴가 나타납니다. 다른 작품을 누르면 열려 있던 「말로 고치기」 창은 자동으로 닫힙니다.`;$('works').replaceChildren();
   for(const w of works){
     const card=document.createElement('div');card.className='work-card';
     const b=document.createElement('button');b.type='button';b.dataset.workId=w.id;
