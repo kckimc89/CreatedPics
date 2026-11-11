@@ -138,13 +138,18 @@ $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value=''
 
 // C2.0: child conversation flow. Rule-based, local-only; never sends voice/audio/images to our own backend.
 const studioChatKey='family-creative-chat-url-c20';
+const studioSettingsDb='family-creative-settings-c20';
 const safeChatUrl=raw=>{try{const u=new URL((raw||'').trim());if(u.protocol!=='https:'||!['chatgpt.com','www.chatgpt.com'].includes(u.hostname)||!/^\/c\/[a-zA-Z0-9_-]+\/?$/.test(u.pathname)||u.search||u.hash)return null;return u.origin+u.pathname;}catch(e){return null;}};
-let studioChatUrl='';try{studioChatUrl=safeChatUrl(localStorage.getItem(studioChatKey))||'';}catch(e){}
-$('chatLink').value=studioChatUrl;
+function settingsDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(studioSettingsDb,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('settings'))r.result.createObjectStore('settings',{keyPath:'key'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('설정 저장소가 다른 화면에서 사용 중입니다.'));});}
+async function settingGet(key){const d=await settingsDb();return await new Promise((resolve,reject)=>{const tx=d.transaction('settings','readonly');const r=tx.objectStore('settings').get(key);r.onsuccess=()=>resolve(r.result?.value||'');r.onerror=()=>reject(r.error);tx.oncomplete=()=>d.close();tx.onerror=()=>{try{d.close();}catch(_){}};});}
+async function settingSet(key,value){const d=await settingsDb();return await new Promise((resolve,reject)=>{const tx=d.transaction('settings','readwrite');tx.objectStore('settings').put({key,value,updated:Date.now()});tx.oncomplete=()=>{d.close();resolve();};tx.onerror=()=>{try{d.close();}catch(_){}reject(tx.error);};tx.onabort=()=>{try{d.close();}catch(_){}reject(tx.error||Error('저장 중단'));};});}
+async function settingDelete(key){const d=await settingsDb();return await new Promise((resolve,reject)=>{const tx=d.transaction('settings','readwrite');tx.objectStore('settings').delete(key);tx.oncomplete=()=>{d.close();resolve();};tx.onerror=()=>{try{d.close();}catch(_){}reject(tx.error);};});}
+let studioChatUrl='';
 function setChatStatus(){ $('chatStatus').textContent=studioChatUrl?'✅ 이 기기에서 창작대화방이 연결되었습니다. 만들기 버튼은 이 대화를 엽니다.':'연결된 전용 대화가 없습니다. 만들기 버튼은 ChatGPT 홈을 엽니다.'; }
-setChatStatus();
-$('chatSave').onclick=()=>{const url=safeChatUrl($('chatLink').value);if(!url){$('chatStatus').textContent='⚠️ 올바른 개인 대화 주소(https://chatgpt.com/c/...)만 사용할 수 있습니다. 공유 주소 /share/...는 안 됩니다.';return;}try{localStorage.setItem(studioChatKey,url);studioChatUrl=url;setChatStatus();}catch(e){$('chatStatus').textContent='⚠️ 주소를 이 기기에 저장하지 못했습니다.';}};
-$('chatClear').onclick=()=>{studioChatUrl='';$('chatLink').value='';try{localStorage.removeItem(studioChatKey);}catch(e){}setChatStatus();};
+async function loadStudioChat(){let raw='';try{raw=await settingGet(studioChatKey);}catch(e){}if(!raw){try{raw=localStorage.getItem(studioChatKey)||'';}catch(e){}}studioChatUrl=safeChatUrl(raw)||'';$('chatLink').value=studioChatUrl;setChatStatus();}
+loadStudioChat();
+$('chatSave').onclick=async()=>{const url=safeChatUrl($('chatLink').value);if(!url){$('chatStatus').textContent='⚠️ 올바른 개인 대화 주소(https://chatgpt.com/c/...)만 사용할 수 있습니다. 공유 주소 /share/...는 안 됩니다.';return;}try{await settingSet(studioChatKey,url);studioChatUrl=url;try{localStorage.setItem(studioChatKey,url);}catch(e){}setChatStatus();$('chatStatus').textContent='✅ 창작대화방 주소를 안전하게 저장했습니다. 이제 만들기 버튼은 이 대화를 엽니다.';}catch(e){$('chatStatus').textContent='⚠️ 주소를 저장하지 못했습니다. iPad 저장 공간 또는 브라우저 저장 권한을 확인해 주세요.';}};
+$('chatClear').onclick=async()=>{studioChatUrl='';$('chatLink').value='';try{await settingDelete(studioChatKey);}catch(e){}try{localStorage.removeItem(studioChatKey);}catch(e){}setChatStatus();};
 let storyItems=[],storyConfirmed=false,pendingChoice=null;
 const storyKeys=[['hair','머리'],['clothes','의상'],['expression','표정'],['pose','자세'],['background','배경'],['friends','친구·소품'],['other','그 밖의 이야기']];
 function talkSay(t){if(!('speechSynthesis' in window)){ $('talkStatus').textContent='읽어주기 기능을 사용할 수 없습니다.';return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ko-KR';u.rate=.88;speechSynthesis.speak(u);}catch(e){$('talkStatus').textContent='읽어주기가 동작하지 않습니다.';}}
