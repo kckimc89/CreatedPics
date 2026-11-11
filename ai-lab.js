@@ -119,13 +119,21 @@ function newDraft({preserveSource=true,preserveParent=false}={}){
   $('workNote').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);showRecipe(null);
   markSelection();
 }
-function markSelection(){$('works').querySelectorAll('button[data-work-id]').forEach(b=>b.classList.toggle('selected',b.dataset.workId===active));}
+function markSelection(){
+  $('works').querySelectorAll('.work-card').forEach(card=>{
+    const b=card.querySelector('button[data-work-id]');
+    const selected=!!b&&b.dataset.workId===active;
+    if(b)b.classList.toggle('selected',selected);
+    const tools=card.querySelector('.work-actions');
+    if(tools)tools.classList.toggle('hidden',!selected);
+  });
+}
 async function normalize(file){if(!file||!file.type.startsWith('image/'))throw Error('JPG, PNG, WebP 등 이미지 파일을 선택해 주세요.');const url=URL.createObjectURL(file);try{const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('사진을 읽지 못했습니다. HEIC는 사진 앱에서 JPEG로 내보낸 뒤 다시 선택해 주세요.'));i.src=url;});const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.90);}finally{URL.revokeObjectURL(url);}}
 $('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
 $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;
   }
-  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요.');
+  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요. 사진 앱 저장은 보관 후 작품 메뉴에서도 할 수 있습니다.');
 }catch(err){message('⚠️ '+err.message);}};
 async function copyPrompt(id){const t=$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
@@ -137,7 +145,7 @@ $('createInChatGPT').onclick=async()=>{
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
  const w=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
- if(copied)message('✅ 요청문을 준비했습니다. 열린 ChatGPT에 원본 사진을 첨부하고 붙여넣은 뒤 보내 주세요.');
+ if(copied)message('✅ 요청문을 준비했습니다. ChatGPT에서 같은 원본사진을 넣고 → 붙여넣기 → 보내기 순서로 진행해 주세요.');
  else message('⚠️ ChatGPT는 열었지만 자동 복사가 되지 않았습니다. 부모용 요청문에서 복사해 주세요.');
  if(!w)message('⚠️ 팝업이 막혔습니다. 부모용 영역의 「ChatGPT 열기」를 눌러 주세요.');
 };
@@ -162,7 +170,7 @@ async function shareToPhotos(data,title){
     const file=await dataUrlToFile(data,name);
     if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
       await navigator.share({files:[file],title:'가족사진 창작 스튜디오'});
-      message('✅ 공유 화면을 열었습니다. iPhone/iPad에서는 「이미지 저장」을 선택하면 사진 앱에 보관됩니다.');
+      message('✅ 공유 화면을 열었습니다. 「이미지 저장」 또는 「사진 앱에 저장」이 보이면 선택해 주세요.');
       return;
     }
   }catch(e){
@@ -195,6 +203,8 @@ $('compareParent').onclick=()=>{
 };
 function getScore(id){return Number($(id).value)||0;}
 $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message('⚠️ 원본과 새 AI 결과 사진을 모두 선택해 주세요.');return;}if(editMode){message('⚠️ 현재 보관 작품을 보고 있습니다. 「같은 원본으로 새 작품 준비」를 누른 후 새 AI 결과를 가져오세요.');return;}
+  const duplicate=works.find(w=>w.result===result);
+  if(duplicate&&!confirm('같은 완성사진이 이미 「'+(duplicate.name||'기존 작품')+'」으로 보관되어 있습니다.\n\n그래도 한 장 더 보관할까요?')){message('중복 보관을 취소했습니다. 기존 작품은 그대로 유지됩니다.');return;}
   saving=true;$('saveResult').disabled=true;const sceneId=$('resultScene').value;const title=$('workTitle').value.trim()||titleFor(sceneId);
   const parentId=repairParent&&works.some(w=>w.id===repairParent)?repairParent:null;
   const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:currentRecipe(),...(parentId?{parentId}:{})};
@@ -205,8 +215,23 @@ function selectWork(w){active=w.id;editMode=true;dirty=false;source=w.original;r
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
   markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
 }
-async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 AI 시험작품 ${works.length}개 · 작품을 선택하면 제목과 장면을 수정하거나 사진을 내보낼 수 있습니다.`;$('works').replaceChildren();
-  for(const w of works){const b=document.createElement('button');b.type='button';b.dataset.workId=w.id;const img=new Image();img.loading='lazy';img.src=w.result;img.alt=w.name||'AI 작품';const small=document.createElement('small');const name=sceneFor(w.scene).name;small.textContent=(w.name||name)+' · '+name+' · 얼굴 '+(w.face||'미평가')+'/5 · 완성도 '+(w.quality||'미평가')+'/5'+(w.parentId?' · 수정작':'');b.append(img,small);b.onclick=()=>selectWork(w);$('works').append(b);}markSelection();
+async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 저장·백업·삭제 메뉴가 나타납니다.`;$('works').replaceChildren();
+  for(const w of works){
+    const card=document.createElement('div');card.className='work-card';
+    const b=document.createElement('button');b.type='button';b.dataset.workId=w.id;
+    const img=new Image();img.loading='lazy';img.src=w.result;img.alt=w.name||'AI 작품';
+    const small=document.createElement('small');const name=sceneFor(w.scene).name;
+    small.textContent=(w.name||name)+' · '+name+(w.parentId?' · 수정작':'');
+    b.append(img,small);b.onclick=()=>selectWork(w);
+    const tools=document.createElement('div');tools.className='work-actions hidden';
+    const photo=document.createElement('button');photo.type='button';photo.className='button';photo.textContent='📷 사진 앱 저장';
+    photo.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('shareSelected').click();};
+    const one=document.createElement('button');one.type='button';one.className='button';one.textContent='📦 1장 백업';
+    one.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('backupOne').click();};
+    const del=document.createElement('button');del.type='button';del.className='button danger';del.textContent='🗑 삭제';
+    del.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('deleteWork').click();};
+    tools.append(photo,one,del);card.append(b,tools);$('works').append(card);
+  }markSelection();
 }
 $('deleteWork').onclick=async()=>{
  if(!active){message('먼저 아래 보관 작품에서 삭제할 작품 한 장을 눌러 주세요.');return;}
@@ -217,7 +242,7 @@ $('deleteWork').onclick=async()=>{
  catch(e){message('⚠️ 작품을 삭제하지 못했습니다. 먼저 백업한 뒤 다시 시도해 주세요.');}
 };
 $('remakeWork').onclick=()=>{
- if(!active){message('먼저 ④ 나의 창작 작품에서 다시 만들 작품을 선택해 주세요.');return;}
+ if(!active){message('먼저 ⑥ 나의 창작 작품에서 다시 만들 작품을 선택해 주세요.');return;}
  const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
  const r=safeRecipe(w.recipe)?w.recipe:null;
  source=w.original;
@@ -276,7 +301,7 @@ $('backup').onclick=async()=>{
 };
 $('backupOne').onclick=async()=>{
  if(backingUp)return;
- if(!active){message('먼저 ④ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}
+ if(!active){message('먼저 ⑥ 보관함에서 백업할 작품 한 장을 선택해 주세요.');return;}
  try{const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
  const safeName=(w.name||'작품').replace(/[\\/:*?"<>|]/g,'_').slice(0,35);
  await exportBackup([w],'AI_마법변신_개별백업_'+safeName+'_'+new Date().toISOString().slice(0,10)+'.json','개별');
@@ -311,7 +336,7 @@ async function updateStorageStatus(){
 }
 $('checkStorage').onclick=updateStorageStatus;
 $('shareSelected').onclick=()=>{
- if(!active){message('먼저 ④ 나의 창작 작품에서 사진 앱에 저장할 작품을 선택해 주세요.');return;}
+ if(!active){message('먼저 ⑥ 나의 창작 작품에서 사진 앱에 저장할 작품을 선택해 주세요.');return;}
  const w=works.find(x=>x.id===active);
  if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
  shareToPhotos(w.result,w.name||titleFor(w.scene));
