@@ -199,7 +199,13 @@ $('talkRemoveLast').onclick=()=>{storyItems.pop();storyConfirmed=false;renderSto
 $('talkReset').onclick=()=>{if(storyItems.length&&!confirm('지금 정리한 이야기만 다시 시작할까요? 기존 작품은 그대로입니다.'))return;storyItems=[];storyConfirmed=false;pendingChoice=null;$('talkInput').value='';$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');$('talkRemoveLast').classList.add('hidden');renderStory();};
 function storyPrompt(){if(!storyItems.length)return '';return '\n\n[아이와 함께 정리한 추가 요청]\n'+storyItems.map((a,i)=>(i+1)+'. '+a.text).join('\n')+'\n기본 장면 지시와 충돌하면 아이가 마지막으로 확인한 추가 요청을 우선해 주세요. 모호한 표현은 임의로 단정하지 말고 창작 대화에서 아이에게 짧게 질문해 주세요. 사진에 요소를 너무 많이 넣어 복잡하게 만들지 마세요.';}
 function getStudioPrompt(){return '[새 창작 작업 시작] 이전에 만든 이미지나 다른 인물의 사진은 이번 작품의 참고로 사용하지 마세요. 이번 메시지에 새로 첨부하는 원본 사진만 인물 참고로 사용하세요.\n\n'+$('prompt').value+storyPrompt();}
-function openStudioChat(){return window.open(studioChatUrl||'https://chatgpt.com/','_blank','noopener,noreferrer');}
+function openStudioChat(){
+  const url=studioChatUrl||'https://chatgpt.com/';
+  // Reuse one dedicated ChatGPT tab instead of opening a new Safari tab every time.
+  const w=window.open(url,'familyCreativeStudioChat');
+  try{if(w)w.focus();}catch(_){}
+  return w;
+}
 renderStory();
 
 async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
