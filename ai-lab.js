@@ -219,16 +219,14 @@ async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).valu
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
  const t=getStudioPrompt();
- if(pendingChoice){message('먼저 ④ 이야기하며 꾸미기에서 자세를 하나 골라 주세요.');$('talkStudio').scrollIntoView({behavior:'smooth'});return;}
- if(storyItems.length&&!storyConfirmed){message('먼저 ④에서 「이대로 만들기」를 눌러 이야기를 확인해 주세요.');$('talkStudio').scrollIntoView({behavior:'smooth'});return;}
  if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');$('originalFile').scrollIntoView({behavior:'smooth',block:'center'});return;}
  if(!t){message('먼저 만들고 싶은 작품을 골라 주세요.');return;}
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
  if(copied){
-   message('✅ 창작 요청을 복사했습니다. 이제 Safari의 GPT 탭으로 이동해 원본사진을 넣고 붙여넣어 보내세요.');
-   if($('twoTabStatus'))$('twoTabStatus').innerHTML='<b>✅ 요청문이 복사되었습니다.</b> 이제 기존 GPT 탭으로 이동하세요. 새 GPT 탭을 열 필요는 없습니다.';
+   message('✅ 기본 창작 요청을 복사했습니다. 이제 GPT 탭으로 이동해 원본사진과 요청문을 보내고, 아이가 말로 작품을 계속 다듬어 보세요.');
+   if($('twoTabStatus'))$('twoTabStatus').innerHTML='<b>✅ 기본 요청이 준비되었습니다.</b> 이제 기존 GPT 탭으로 이동해 아이가 말로 창작을 이어가세요.';
  }else message('⚠️ 자동 복사가 되지 않았습니다. 부모용 요청문에서 먼저 복사해 주세요.');
 };
 function showReturnHelper(){
@@ -300,25 +298,19 @@ function selectWork(w){for(const e of document.querySelectorAll('.modify-panel')
 }
 
 function showVoiceEdit(w,card){
- repairParent=w.id;repairPromptParent=w.id;
  for(const e of document.querySelectorAll('.modify-panel'))e.remove();
  const p=document.createElement('section');p.className='modify-panel';
- p.innerHTML='<div class="modify-head"><h3>🎤 어떻게 고칠까요?</h3><button type="button" class="modify-close" data-do="close" aria-label="수정창 닫기">×</button></div><p class="status">완성된 작품을 GPT 대화방에 첨부한 다음, 말로 정리한 수정 요청을 붙여넣어 주세요.</p><textarea class="talk-input" rows="3" placeholder="예: 머리를 두 갈래로 묶고, 손을 아이 손처럼 자연스럽게 고쳐줘"></textarea><div class="talk-controls"><button type="button" class="button mod-big" data-do="speak">🎤 말하기</button><button type="button" class="button strong mod-big" data-do="go">📋 수정 요청 준비</button></div><p class="status" data-note>말하기가 안 되면 입력칸에서 키보드 🎤 받아쓰기를 사용하세요.</p>';
+ p.innerHTML='<div class="modify-head"><h3>💬 GPT에서 다시 고치기</h3><button type="button" class="modify-close" data-do="close" aria-label="수정창 닫기">×</button></div><p class="status">기존 GPT 창작방으로 가서 이 작품을 보거나 다시 첨부한 뒤, 원하는 수정 내용을 아이가 마이크로 말하면 됩니다.</p><div class="talk-controls"><button type="button" class="button strong mod-big" data-do="ready">📋 수정 시작 안내 복사</button></div><p class="status" data-note>예: “머리를 두 갈래로 묶어줘”, “토끼는 빼줘”, “조금 더 웃게 해줘”.</p>';
  card.append(p);
- const input=p.querySelector('textarea'),note=p.querySelector('[data-note]');
+ const note=p.querySelector('[data-note]');
  p.querySelector('[data-do="close"]').onclick=()=>p.remove();
- p.querySelector('[data-do="speak"]').onclick=()=>{if(!SpeechApi){input.focus();note.textContent='키보드의 🎤 받아쓰기를 사용해 주세요.';return;}try{const r=new SpeechApi();r.lang='ko-KR';r.onresult=e=>{input.value=(input.value+' '+e.results[0][0].transcript).trim();note.textContent='✅ 말한 내용을 확인한 뒤 GPT에서 고치기를 눌러 주세요.';};r.onerror=()=>note.textContent='음성 인식이 안 됩니다. 키보드 받아쓰기를 이용해 주세요.';r.start();}catch(e){input.focus();}};
- p.querySelector('[data-do="go"]').onclick=async()=>{
- const t=input.value.trim();if(!t){note.textContent='먼저 고치고 싶은 점을 말해 주세요.';return;}
- const parts=parseStory(t).slice(0,12).map((x,i)=>(i+1)+'. '+x.text).join('\n');
- const req='첨부한 AI 창작사진 한 장을 수정해 주세요. 새 인물을 만들지 마세요.\n\n[아이가 원하는 수정]\n'+parts+'\n\n[반드시 유지] 동일 인물의 얼굴 특징·나이, 변경 대상으로 지정하지 않은 자세·의상·배경·조명은 최대한 유지하세요. 팔·손·다리 수와 관절 연결을 자연스럽게 확인하세요. 불필요한 인물·워터마크·문자는 넣지 마세요. 사진처럼 사실적인 결과 이미지 한 장을 만들어 주세요.';
- try{await navigator.clipboard.writeText(req);note.textContent='✅ 수정 요청을 복사했어요. GPT에 현재 완성사진을 첨부하고 붙여넣어 보내세요.';}catch(e){note.textContent='복사가 막혔습니다. 아래 요청문을 길게 눌러 복사하세요.';const ta=document.createElement('textarea');ta.className='talk-input';ta.readOnly=true;ta.value=req;p.append(ta);}
- try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(e){}
- note.textContent='✅ 수정 요청을 준비했습니다. 이제 기존 GPT 탭으로 이동해 현재 완성사진을 첨부하고 붙여넣어 보내세요.';
+ p.querySelector('[data-do="ready"]').onclick=async()=>{
+   const req='이 작품을 계속 수정하고 싶어요. 같은 인물과 전체 분위기는 유지하고, 지금부터 제가 말하는 수정 요청을 하나씩 반영해 주세요. 매번 기존 결과에서 필요한 부분만 고치고 다른 부분은 최대한 유지해 주세요.';
+   try{await navigator.clipboard.writeText(req);note.textContent='✅ 시작 안내를 복사했습니다. 기존 GPT 탭으로 가서 붙여넣고, 이후에는 아이가 마이크로 말하며 수정하면 됩니다.';}catch(e){note.textContent='복사가 되지 않았습니다. GPT 창작방으로 가서 바로 말로 수정 요청을 시작해도 됩니다.';}
  };
 }
 
-async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 관리 메뉴가 나타납니다. 다른 작품을 누르면 열려 있던 「말로 고치기」 창은 자동으로 닫힙니다.`;$('works').replaceChildren();
+async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 관리 메뉴가 나타납니다. 다른 작품을 누르면 열려 있던 「GPT에서 고치기」 안내는 자동으로 닫힙니다.`;$('works').replaceChildren();
   for(const w of works){
     const card=document.createElement('div');card.className='work-card';
     const b=document.createElement('button');b.type='button';b.dataset.workId=w.id;
@@ -333,7 +325,7 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
     one.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('backupOne').click();};
     const del=document.createElement('button');del.type='button';del.className='button danger';del.textContent='🗑 삭제';
     del.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('deleteWork').click();};
-    const modify=document.createElement('button');modify.type='button';modify.className='button';modify.textContent='🎤 말로 고치기';
+    const modify=document.createElement('button');modify.type='button';modify.className='button';modify.textContent='💬 GPT에서 고치기';
     modify.onclick=e=>{e.stopPropagation();active=w.id;selectWork(w);showVoiceEdit(w,card);};
     const redo=document.createElement('button');redo.type='button';redo.className='button';redo.textContent='🔁 다시 만들기';
     redo.onclick=e=>{e.stopPropagation();active=w.id;$('remakeWork').click();document.querySelector('.studio-hero')?.scrollIntoView({behavior:'smooth'});};
