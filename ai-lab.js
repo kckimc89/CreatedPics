@@ -109,6 +109,7 @@ async function transact(mode,act){const d=await db();return new Promise((resolve
 const fetchAll=()=>transact('readonly',s=>s.getAll());
 const put=item=>transact('readwrite',s=>s.put(item));
 const add=item=>transact('readwrite',s=>s.add(item));
+const removeWork=id=>transact('readwrite',s=>s.delete(id));
 function view(id,data){const el=$(id);el.replaceChildren();if(!data){const sp=document.createElement('span');sp.textContent='사진을 선택해 주세요';el.append(sp);return;}const img=new Image();img.alt=id==='originalView'?'원본 아이 사진':'AI로 만든 시험 결과';img.src=data;el.append(img);}
 function clearRepair(clearParent=true){if(clearParent)repairParent=null;repairPromptParent=null;$('repairPrompt').value='';$('repairLineage').textContent='수정 전 작품: 선택되지 않음';$('repairCompare').classList.add('hidden');}
 function resetScores(){for(const id of ['face','quality','anatomy','poseScore'])$(id).value='';}
@@ -124,7 +125,7 @@ $('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value=
 $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;
   }
-  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();message('✅ 새 AI 결과를 가져왔습니다. 평가 후 새 작품으로 저장할 수 있습니다.');
+  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요.');
 }catch(err){message('⚠️ '+err.message);}};
 async function copyPrompt(id){const t=$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
@@ -134,11 +135,20 @@ $('createInChatGPT').onclick=async()=>{
  if(!t){message('먼저 만들고 싶은 작품을 골라 주세요.');return;}
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
+ try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
  const w=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
  if(copied)message('✅ 요청문을 준비했습니다. 열린 ChatGPT에 원본 사진을 첨부하고 붙여넣은 뒤 보내 주세요.');
  else message('⚠️ ChatGPT는 열었지만 자동 복사가 되지 않았습니다. 부모용 요청문에서 복사해 주세요.');
  if(!w)message('⚠️ 팝업이 막혔습니다. 부모용 영역의 「ChatGPT 열기」를 눌러 주세요.');
 };
+function showReturnHelper(){
+ let waiting=false;try{waiting=sessionStorage.getItem('creativeStudioAwaitingResult')==='1';}catch(_){}
+ $('returnHelper').classList.toggle('hidden',!waiting);
+}
+window.addEventListener('focus',()=>setTimeout(showReturnHelper,120));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)showReturnHelper();});
+$('returnImport').onclick=()=>{$('returnHelper').classList.add('hidden');$('resultFile').click();};
+showReturnHelper();
 function download(data,name){if(!data){message('먼저 AI 결과를 불러오세요.');return;}const a=document.createElement('a');a.href=data;a.download=name;a.click();}
 function safeImageName(title){return ('가족사진_창작스튜디오_'+(title||'창작사진')).replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+'.jpg';}
 async function dataUrlToFile(data,name){
@@ -198,6 +208,14 @@ function selectWork(w){active=w.id;editMode=true;dirty=false;source=w.original;r
 async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 AI 시험작품 ${works.length}개 · 작품을 선택하면 제목과 장면을 수정하거나 사진을 내보낼 수 있습니다.`;$('works').replaceChildren();
   for(const w of works){const b=document.createElement('button');b.type='button';b.dataset.workId=w.id;const img=new Image();img.loading='lazy';img.src=w.result;img.alt=w.name||'AI 작품';const small=document.createElement('small');const name=sceneFor(w.scene).name;small.textContent=(w.name||name)+' · '+name+' · 얼굴 '+(w.face||'미평가')+'/5 · 완성도 '+(w.quality||'미평가')+'/5'+(w.parentId?' · 수정작':'');b.append(img,small);b.onclick=()=>selectWork(w);$('works').append(b);}markSelection();
 }
+$('deleteWork').onclick=async()=>{
+ if(!active){message('먼저 아래 보관 작품에서 삭제할 작품 한 장을 눌러 주세요.');return;}
+ const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
+ const ok=confirm('「'+(w.name||'선택 작품')+'」 한 장만 삭제할까요?\n\n사진 앱에 저장한 사진과 다른 보관 작품은 삭제되지 않습니다.');
+ if(!ok){message('삭제를 취소했습니다.');return;}
+ try{await removeWork(w.id);active=null;editMode=false;result=null;view('resultView',null);showRecipe(null);await refresh();message('🗑 선택한 작품 1장을 삭제했습니다. 다른 작품은 그대로 유지됩니다.');}
+ catch(e){message('⚠️ 작품을 삭제하지 못했습니다. 먼저 백업한 뒤 다시 시도해 주세요.');}
+};
 $('remakeWork').onclick=()=>{
  if(!active){message('먼저 ④ 나의 창작 작품에서 다시 만들 작품을 선택해 주세요.');return;}
  const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
