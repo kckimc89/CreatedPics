@@ -1,15 +1,15 @@
-/* MASTER C1.4.14 — stabilization for Family Photo Creative Studio.
-Adds recipe metadata for new works, safe remake flow, one-file-at-a-time split backup,
-and storage-status guidance. Preserves existing IndexedDB names, records, backup format v1 and presets. */
+/* MASTER C1.5 — child-first common creative engine.
+Adds illustrated scene cards and one-tap prompt-copy + ChatGPT launch.
+Preserves all existing IndexedDB names, records, recipes, backup format v1 and presets. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
 const scenes=[
-{id:'castle',name:'🏰 동화성에서 뛰기',desc:'활짝 웃으며 꽃길을 뛰어오는 모습. 신체 자세와 자연스러운 햇살을 검증합니다.',scene:'황금빛 햇살이 비치는 풍성한 장미 정원과 아름다운 동화성의 돌길을 즐겁게 뛰어오는 장면',pose:'가벼운 달리기 자세, 한 손을 앞으로 내밀고 자연스러운 환한 미소',clothes:'원래 옷의 특징을 최대한 유지하되 자연스럽게 움직이는 옷자락'},
-{id:'ocean',name:'🐢 바닷속 헤엄치기',desc:'물속에서 떠 있는 자세와 머리카락, 거품, 물빛 조화를 검증합니다.',scene:'햇살이 비치는 투명한 산호 궁전 바닷속에서 바다거북과 열대어 사이를 헤엄치는 장면',pose:'물속에서 수평으로 헤엄치는 자연스러운 전신 자세, 양팔을 부드럽게 펼친 모습, 밝은 미소',clothes:'푸른색의 우아한 바다 탐험 의상, 물결에 따라 흐르는 머리카락과 옷자락'},
-{id:'space',name:'🚀 우주에서 날기',desc:'우주복으로 갈아입고 공중에 뜬 포즈, 조명과 손 모양을 검증합니다.',scene:'지구와 행성, 성운과 반짝이는 별이 멀리 보이는 아름다운 우주 공간을 탐험하는 장면',pose:'무중력 상태에서 부드럽게 떠 있는 전신 자세, 한 손으로 인사하며 기쁨을 표현',clothes:'얼굴이 가려지지 않는 안전한 우주복, 생생한 소재와 디테일'},
-{id:'forest',name:'🦌 마법숲의 친구들',desc:'동물과 교감하는 자세 및 자연스러운 시선과 표정을 확인합니다.',scene:'반딧불과 작은 사슴, 토끼가 있는 달빛 마법숲의 아름다운 오솔길',pose:'작은 사슴을 바라보며 살짝 앉아 다정하게 손을 내미는 자세, 호기심 어린 미소',clothes:'꽃무늬의 자연스러운 동화풍 의상'},
-{id:'cloud',name:'🌈 무지개 구름여행',desc:'날아가는 자세와 머리카락, 옷자락의 자연스러움을 확인합니다.',scene:'무지개와 반짝이는 하늘 궁전이 있는 환상적인 구름나라',pose:'양팔을 벌리고 구름 위를 날아가는 듯한 역동적인 자세, 환하게 웃는 표정',clothes:'가벼운 파스텔빛 여행 의상과 자연스럽게 펄럭이는 옷자락'},
-{id:'garden',name:'🌸 꽃정원에서 놀기',desc:'꽃이나 나비와의 자연스러운 상호작용을 확인합니다.',scene:'햇빛과 나비, 다채로운 장미와 수국이 가득한 고품질 영화 같은 꽃정원',pose:'꽃을 들고 나비를 바라보며 웃는 자연스러운 앉은 자세',clothes:'사진의 인물과 어울리는 꽃무늬 여름옷'}
+{id:'castle',thumb:'scene-thumbs/castle.jpg',name:'🏰 동화성에서 뛰기',desc:'활짝 웃으며 꽃길을 뛰어오는 모습. 신체 자세와 자연스러운 햇살을 검증합니다.',scene:'황금빛 햇살이 비치는 풍성한 장미 정원과 아름다운 동화성의 돌길을 즐겁게 뛰어오는 장면',pose:'가벼운 달리기 자세, 한 손을 앞으로 내밀고 자연스러운 환한 미소',clothes:'원래 옷의 특징을 최대한 유지하되 자연스럽게 움직이는 옷자락'},
+{id:'ocean',thumb:'scene-thumbs/ocean.jpg',name:'🐢 바닷속 헤엄치기',desc:'물속에서 떠 있는 자세와 머리카락, 거품, 물빛 조화를 검증합니다.',scene:'햇살이 비치는 투명한 산호 궁전 바닷속에서 바다거북과 열대어 사이를 헤엄치는 장면',pose:'물속에서 수평으로 헤엄치는 자연스러운 전신 자세, 양팔을 부드럽게 펼친 모습, 밝은 미소',clothes:'푸른색의 우아한 바다 탐험 의상, 물결에 따라 흐르는 머리카락과 옷자락'},
+{id:'space',thumb:'scene-thumbs/space.jpg',name:'🚀 우주에서 날기',desc:'우주복으로 갈아입고 공중에 뜬 포즈, 조명과 손 모양을 검증합니다.',scene:'지구와 행성, 성운과 반짝이는 별이 멀리 보이는 아름다운 우주 공간을 탐험하는 장면',pose:'무중력 상태에서 부드럽게 떠 있는 전신 자세, 한 손으로 인사하며 기쁨을 표현',clothes:'얼굴이 가려지지 않는 안전한 우주복, 생생한 소재와 디테일'},
+{id:'forest',thumb:'scene-thumbs/forest.jpg',name:'🦌 마법숲의 친구들',desc:'동물과 교감하는 자세 및 자연스러운 시선과 표정을 확인합니다.',scene:'반딧불과 작은 사슴, 토끼가 있는 달빛 마법숲의 아름다운 오솔길',pose:'작은 사슴을 바라보며 살짝 앉아 다정하게 손을 내미는 자세, 호기심 어린 미소',clothes:'꽃무늬의 자연스러운 동화풍 의상'},
+{id:'cloud',thumb:'scene-thumbs/cloud.jpg',name:'🌈 무지개 구름여행',desc:'날아가는 자세와 머리카락, 옷자락의 자연스러움을 확인합니다.',scene:'무지개와 반짝이는 하늘 궁전이 있는 환상적인 구름나라',pose:'양팔을 벌리고 구름 위를 날아가는 듯한 역동적인 자세, 환하게 웃는 표정',clothes:'가벼운 파스텔빛 여행 의상과 자연스럽게 펄럭이는 옷자락'},
+{id:'garden',thumb:'scene-thumbs/garden.jpg',name:'🌸 꽃정원에서 놀기',desc:'꽃이나 나비와의 자연스러운 상호작용을 확인합니다.',scene:'햇빛과 나비, 다채로운 장미와 수국이 가득한 고품질 영화 같은 꽃정원',pose:'꽃을 들고 나비를 바라보며 웃는 자연스러운 앉은 자세',clothes:'사진의 인물과 어울리는 꽃무늬 여름옷'}
 ];
 const titles={castle:'꽃길을 달리는 나',ocean:'산호 궁전의 바다 탐험',space:'별나라 우주 탐험가',forest:'마법숲에서 만난 친구',cloud:'구름 위의 신나는 여행',garden:'꽃과 나비의 비밀 정원'};
 const titleFor=id=>titles[id]||'새로운 환상 작품';
@@ -50,7 +50,7 @@ function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(s
    $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여, 같은 아이임을 알아볼 수 있는 사실적인 창작사진 한 장을 만들어 주세요. 원본 사진의 얼굴을 임의로 재해석하지 마세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[지시 우선순위] 직접 선택한 표정·자세·의상이 장면 기본값보다 우선합니다. 장면 이름은 배경 분류명일 뿐, 동작을 강제하지 않습니다. 예를 들어 ‘동화성에서 뛰기’에서 ‘앉기’를 선택했다면 동화성 배경에 앉은 모습만 그리세요. 달리기·헤엄치기·날기 등 충돌하는 동작을 섞지 마세요.\n\n[가장 중요한 기준: 얼굴 동일성] 원본의 얼굴형, 이마·턱 윤곽, 눈 사이 거리와 눈매, 코와 입의 형태 및 비율, 헤어라인·머리색, 실제 나이의 인상을 최대한 유지하세요. 피부를 인위적으로 매끈하게 만들거나 눈을 과장하거나 얼굴을 미화하지 마세요. 표정이 달라져도 같은 아이의 얼굴이어야 합니다. 원본에서 보이지 않는 얼굴 특징은 함부로 새로 만들지 마세요.\n\n[자세와 신체 구조] 먼저 한 명의 인물이 취할 수 있는 자세인지 확인하세요. 어깨–팔꿈치–손목–손, 골반–무릎–발목–발이 자연스럽게 이어지게 하세요. 손과 발은 실제 보이는 만큼만 표현하고, 가려진 손·발을 억지로 드러내거나 추가하지 마세요. 손가락 수와 방향, 소품을 잡는 손의 접촉을 자연스럽게 표현하세요. 팔·다리·손·발이 중복되거나 몸통에서 떨어져 보이지 않게 하세요.\n\n[자세별 물리적 일관성] 앉기라면 엉덩이와 발을 지지하는 바닥·의자·돌 등의 접촉점을 분명히 하세요. 달리기라면 무게중심과 다리 움직임을 맞추세요. 헤엄치기라면 물속의 몸 방향과 부력·머리카락 흐름을 맞추세요. 우주·구름 장면이라면 중력감이 장면 설정과 어울리도록 하되 신체 구조는 현실적으로 유지하세요. 선택하지 않은 동작을 추가하지 마세요.\n\n[인물과 배경의 통합] 인물의 얼굴과 의상에 비치는 빛의 방향·색온도·밝기가 배경과 일치해야 합니다. 발이나 몸이 지면에 닿는 경우 접촉 그림자를 넣고, 물속이라면 수중 빛과 물의 색감을 인물에도 자연스럽게 반영하세요. 인물 크기·초점·원근감·경계선·머리카락과 옷자락을 주변 환경과 맞춰 합성 티가 나지 않게 하세요.\n\n[구도와 사진 품질] 얼굴은 알아보기 쉽고 선명하게, 선택한 자세는 확인할 수 있게 구성하세요. 한 장의 고해상도 사실적인 사진처럼 표현하세요. 추가 인물, 중복 얼굴, 불필요한 소품, 글자, 워터마크, 분할 화면, 콜라주를 넣지 마세요.\n\n[최종 점검] ① 원본과 같은 아이인지 ② 선택한 표정·자세·의상이 정확한지 ③ 팔·손·손가락·다리·발의 연결이 자연스러운지 ④ 배경과 인물의 조명·그림자가 맞는지 확인하고 오류를 최소화하세요. 완벽한 일치를 보장할 수 없는 부분은 과장하거나 임의로 꾸미지 마세요. 이 이미지는 실제 기록이 아닌 상상 속 창작사진입니다.`;
 }
 function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;}
-for(const s of scenes){const b=document.createElement('button');b.type='button';b.textContent=s.name;b.dataset.id=s.id;b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
+for(const s of scenes){const b=document.createElement('button');b.type='button';b.dataset.id=s.id;b.setAttribute('aria-label',s.name);const img=document.createElement('img');img.src=s.thumb;img.alt=s.name;img.loading='lazy';const label=document.createElement('span');label.className='scene-label';label.textContent=s.name;b.append(img,label);b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
 $('resultScene').onchange=()=>selectScene($('resultScene').value);
 for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).addEventListener('change',()=>displayScene(selected,false));
 $('resetChoices').onclick=()=>{for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).value='';displayScene(selected,false);};
@@ -128,6 +128,17 @@ $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value=''
 }catch(err){message('⚠️ '+err.message);}};
 async function copyPrompt(id){const t=$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
+$('createInChatGPT').onclick=async()=>{
+ const t=$('prompt').value;
+ if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');$('originalFile').scrollIntoView({behavior:'smooth',block:'center'});return;}
+ if(!t){message('먼저 만들고 싶은 작품을 골라 주세요.');return;}
+ let copied=false;
+ try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
+ const w=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
+ if(copied)message('✅ 요청문을 준비했습니다. 열린 ChatGPT에 원본 사진을 첨부하고 붙여넣은 뒤 보내 주세요.');
+ else message('⚠️ ChatGPT는 열었지만 자동 복사가 되지 않았습니다. 부모용 요청문에서 복사해 주세요.');
+ if(!w)message('⚠️ 팝업이 막혔습니다. 부모용 영역의 「ChatGPT 열기」를 눌러 주세요.');
+};
 function download(data,name){if(!data){message('먼저 AI 결과를 불러오세요.');return;}const a=document.createElement('a');a.href=data;a.download=name;a.click();}
 function safeImageName(title){return ('가족사진_창작스튜디오_'+(title||'창작사진')).replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+'.jpg';}
 async function dataUrlToFile(data,name){
