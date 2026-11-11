@@ -15,7 +15,7 @@ const titles={castle:'꽃길을 달리는 나',ocean:'산호 궁전의 바다 �
 const titleFor=id=>titles[id]||'새로운 환상 작품';
 const sceneFor=id=>scenes.find(s=>s.id===id)||scenes[0];
 function currentRecipe(){
- return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value};
+ return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value,parentExtra:$('parentExtra')?.value.trim()||''};
 }
 function safeRecipe(r){
  return r&&typeof r==='object'&&r.version===1&&typeof r.scene==='string'&&scenes.some(s=>s.id===r.scene)&&
@@ -49,11 +49,11 @@ function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(s
   $('sceneDesc').textContent=pose ? `선택한 배경에서 ${pose} · 직접 선택한 자세를 우선합니다. (장면의 원래 동작은 적용하지 않음)` : s.desc;
    $('prompt').value=`첨부한 사진 속 실제 아이 한 명을 유일한 인물 참고 이미지로 사용하여, 같은 아이임을 알아볼 수 있는 사실적인 창작사진 한 장을 만들어 주세요. 원본 사진의 얼굴을 임의로 재해석하지 마세요.\n\n[장면] ${scene}\n[표정] ${expression||'장면에 어울리는 자연스러운 표정'}\n[자세] ${pose||s.pose}\n[의상] ${clothes||s.clothes}\n\n[지시 우선순위] 직접 선택한 표정·자세·의상이 장면 기본값보다 우선합니다. 장면 이름은 배경 분류명일 뿐, 동작을 강제하지 않습니다. 예를 들어 ‘동화성에서 뛰기’에서 ‘앉기’를 선택했다면 동화성 배경에 앉은 모습만 그리세요. 달리기·헤엄치기·날기 등 충돌하는 동작을 섞지 마세요.\n\n[가장 중요한 기준: 얼굴 동일성] 원본의 얼굴형, 이마·턱 윤곽, 눈 사이 거리와 눈매, 코와 입의 형태 및 비율, 헤어라인·머리색, 실제 나이의 인상을 최대한 유지하세요. 피부를 인위적으로 매끈하게 만들거나 눈을 과장하거나 얼굴을 미화하지 마세요. 표정이 달라져도 같은 아이의 얼굴이어야 합니다. 원본에서 보이지 않는 얼굴 특징은 함부로 새로 만들지 마세요.\n\n[자세와 신체 구조] 먼저 한 명의 인물이 취할 수 있는 자세인지 확인하세요. 어깨–팔꿈치–손목–손, 골반–무릎–발목–발이 자연스럽게 이어지게 하세요. 손과 발은 실제 보이는 만큼만 표현하고, 가려진 손·발을 억지로 드러내거나 추가하지 마세요. 손가락 수와 방향, 소품을 잡는 손의 접촉을 자연스럽게 표현하세요. 팔·다리·손·발이 중복되거나 몸통에서 떨어져 보이지 않게 하세요.\n\n[자세별 물리적 일관성] 앉기라면 엉덩이와 발을 지지하는 바닥·의자·돌 등의 접촉점을 분명히 하세요. 달리기라면 무게중심과 다리 움직임을 맞추세요. 헤엄치기라면 물속의 몸 방향과 부력·머리카락 흐름을 맞추세요. 우주·구름 장면이라면 중력감이 장면 설정과 어울리도록 하되 신체 구조는 현실적으로 유지하세요. 선택하지 않은 동작을 추가하지 마세요.\n\n[인물과 배경의 통합] 인물의 얼굴과 의상에 비치는 빛의 방향·색온도·밝기가 배경과 일치해야 합니다. 발이나 몸이 지면에 닿는 경우 접촉 그림자를 넣고, 물속이라면 수중 빛과 물의 색감을 인물에도 자연스럽게 반영하세요. 인물 크기·초점·원근감·경계선·머리카락과 옷자락을 주변 환경과 맞춰 합성 티가 나지 않게 하세요.\n\n[구도와 사진 품질] 얼굴은 알아보기 쉽고 선명하게, 선택한 자세는 확인할 수 있게 구성하세요. 한 장의 고해상도 사실적인 사진처럼 표현하세요. 추가 인물, 중복 얼굴, 불필요한 소품, 글자, 워터마크, 분할 화면, 콜라주를 넣지 마세요.\n\n[최종 점검] ① 원본과 같은 아이인지 ② 선택한 표정·자세·의상이 정확한지 ③ 팔·손·손가락·다리·발의 연결이 자연스러운지 ④ 배경과 인물의 조명·그림자가 맞는지 확인하고 오류를 최소화하세요. 완벽한 일치를 보장할 수 없는 부분은 과장하거나 임의로 꾸미지 마세요. 이 이미지는 실제 기록이 아닌 상상 속 창작사진입니다.`;
 }
-function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;}
+function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;updateFinalPrompt();}
 for(const s of scenes){const b=document.createElement('button');b.type='button';b.dataset.id=s.id;b.setAttribute('aria-label',s.name);const img=document.createElement('img');img.src=s.thumb;img.alt=s.name;img.loading='lazy';img.onerror=()=>{img.style.display='none';b.classList.add('thumb-failed');};const label=document.createElement('span');label.className='scene-label';label.textContent=s.name;b.append(img,label);b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
 $('resultScene').onchange=()=>selectScene($('resultScene').value);
-for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).addEventListener('change',()=>displayScene(selected,false));
-$('resetChoices').onclick=()=>{for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).value='';displayScene(selected,false);};
+for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).addEventListener('change',()=>{displayScene(selected,false);updateFinalPrompt();});
+$('resetChoices').onclick=()=>{for(const id of ['expressionChoice','poseChoice','clothesChoice'])$(id).value='';displayScene(selected,false);updateFinalPrompt();};
 displayScene('castle',true);setTitleForScene('castle');
 // C1.4.9: Separate IndexedDB for presets; never alter the existing works database.
 const presetKey='family-creative-ai-lab-presets-c148';
@@ -116,7 +116,7 @@ function resetScores(){for(const id of ['face','quality','anatomy','poseScore'])
 function newDraft({preserveSource=true,preserveParent=false}={}){
   active=null;editMode=false;dirty=false;result=null;view('resultView',null);if(!preserveSource){source=null;view('originalView',null);}
   if(!preserveParent)clearRepair();else{$('repairPrompt').value='';repairPromptParent=null;$('repairCompare').classList.add('hidden');}
-  $('workNote').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);showRecipe(null);
+  $('workNote').value='';if($('parentExtra'))$('parentExtra').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);showRecipe(null);updateFinalPrompt();
   markSelection();
 }
 function markSelection(){
@@ -178,6 +178,7 @@ function renderStory(){const el=$('talkSummary');el.replaceChildren();const titl
  if(!storyItems.length){const p=document.createElement('p');p.textContent='아직 정리한 이야기가 없어요.';el.append(p);return;}
  const ul=document.createElement('ul');for(const a of storyItems){const li=document.createElement('li');li.textContent=(storyKeys.find(x=>x[0]===a.key)||['','추가 이야기'])[1]+' · '+a.text;ul.append(li);}el.append(ul);
  if(storyItems.length>5){const p=document.createElement('p');p.textContent='💡 이야기가 많아요. 중요한 5가지를 먼저 골라 완성하고, 나머지는 GPT에서 더 꾸밀 수 있어요.';el.append(p);}
+ updateFinalPrompt();
 }
 function talkCheckConflict(){
  const pose=storyItems.filter(x=>x.key==='pose').map(x=>x.text).join(' ');
@@ -198,17 +199,22 @@ $('talkApprove').onclick=()=>{if(pendingChoice)return;storyConfirmed=true;render
 $('talkRemoveLast').onclick=()=>{storyItems.pop();storyConfirmed=false;renderStory();askStory();};
 $('talkReset').onclick=()=>{if(storyItems.length&&!confirm('지금 정리한 이야기만 다시 시작할까요? 기존 작품은 그대로입니다.'))return;storyItems=[];storyConfirmed=false;pendingChoice=null;$('talkInput').value='';$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');$('talkRemoveLast').classList.add('hidden');renderStory();};
 function storyPrompt(){if(!storyItems.length)return '';return '\n\n[아이와 함께 정리한 추가 요청]\n'+storyItems.map((a,i)=>(i+1)+'. '+a.text).join('\n')+'\n기본 장면 지시와 충돌하면 아이가 마지막으로 확인한 추가 요청을 우선해 주세요. 모호한 표현은 임의로 단정하지 말고 창작 대화에서 아이에게 짧게 질문해 주세요. 사진에 요소를 너무 많이 넣어 복잡하게 만들지 마세요.';}
-function getStudioPrompt(){return '[새 창작 작업 시작] 이전에 만든 이미지나 다른 인물의 사진은 이번 작품의 참고로 사용하지 마세요. 이번 메시지에 새로 첨부하는 원본 사진만 인물 참고로 사용하세요.\n\n'+$('prompt').value+storyPrompt();}
+function parentExtraPrompt(){const t=$('parentExtra')?.value.trim()||'';return t?'\n\n[부모 추가 요청]\n'+t+'\n위 추가 요청은 아이의 확정된 선택과 충돌하지 않는 범위에서 반영해 주세요. 충돌한다면 창작 대화에서 짧게 확인해 주세요.':'';}
+function getStudioPrompt(){return '[새 창작 작업 시작] 이전에 만든 이미지나 다른 인물의 사진은 이번 작품의 참고로 사용하지 마세요. 이번 메시지에 새로 첨부하는 원본 사진만 인물 참고로 사용하세요.\n\n'+$('prompt').value+storyPrompt()+parentExtraPrompt();}
+function updateFinalPrompt(){if($('finalPrompt'))$('finalPrompt').value=getStudioPrompt();}
 function openStudioChat(){
   const url=studioChatUrl||'https://chatgpt.com/';
-  // Reuse one dedicated ChatGPT tab instead of opening a new Safari tab every time.
-  const w=window.open(url,'familyCreativeStudioChat');
-  try{if(w)w.focus();}catch(_){}
-  return w;
+  // iPad Safari may ignore named-window reuse for cross-site navigation.
+  // Use the current tab so repeated creations never accumulate Safari tabs.
+  window.location.assign(url);
+  return true;
 }
 renderStory();
+if($('parentExtra'))$('parentExtra').addEventListener('input',updateFinalPrompt);
+if($('openChatParent'))$('openChatParent').onclick=()=>{openStudioChat();};
+updateFinalPrompt();
 
-async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
+async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 최종 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){const target=id==='prompt'&&$('finalPrompt')?$('finalPrompt'):$(id);target.value=t;target.focus();target.select();message('최종 요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
  const t=getStudioPrompt();
@@ -219,10 +225,9 @@ $('createInChatGPT').onclick=async()=>{
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
- const w=openStudioChat();
- if(copied)message('✅ 요청문을 준비했습니다. ChatGPT에서 같은 원본사진을 넣고 → 붙여넣기 → 보내기 순서로 진행해 주세요.');
- else message('⚠️ ChatGPT는 열었지만 자동 복사가 되지 않았습니다. 부모용 요청문에서 복사해 주세요.');
- if(!w)message('⚠️ 팝업이 막혔습니다. 부모용 영역의 「ChatGPT 열기」를 눌러 주세요.');
+ if(copied)message('✅ 요청문을 준비했습니다. 같은 탭에서 ChatGPT 창작방으로 이동합니다. 완성 후 Safari의 〈 뒤로가기로 스튜디오에 돌아오세요.');
+ else message('⚠️ 자동 복사가 되지 않았습니다. 부모용 요청문에서 먼저 복사해 주세요.');
+ setTimeout(openStudioChat,80);
 };
 function showReturnHelper(){
  let waiting=false;try{waiting=sessionStorage.getItem('creativeStudioAwaitingResult')==='1';}catch(_){}
@@ -231,6 +236,7 @@ function showReturnHelper(){
 window.addEventListener('focus',()=>setTimeout(showReturnHelper,120));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)showReturnHelper();});
 $('returnImport').onclick=()=>{$('returnHelper').classList.add('hidden');$('resultFile').click();};
+if($('returnClose'))$('returnClose').onclick=()=>$('returnHelper').classList.add('hidden');
 showReturnHelper();
 function download(data,name){if(!data){message('먼저 AI 결과를 불러오세요.');return;}const a=document.createElement('a');a.href=data;a.download=name;a.click();}
 function safeImageName(title){return ('가족사진_창작스튜디오_'+(title||'창작사진')).replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+'.jpg';}
@@ -353,6 +359,7 @@ $('remakeWork').onclick=()=>{
    $('expressionChoice').value='';$('poseChoice').value='';$('clothesChoice').value='';selected=w.scene;displayScene(w.scene,true);
  }
  newDraft({preserveSource:true,preserveParent:false});
+ if(r&&$('parentExtra')){$('parentExtra').value=r.parentExtra||'';updateFinalPrompt();}
  // newDraft resets the default title; make the relationship obvious without changing old work.
  $('workTitle').value=(w.name||titleFor(w.scene))+' - 다시 만들기';
  message(r?'✅ 저장된 레시피를 불러왔습니다. 요청문을 복사해 새 결과를 만든 뒤 별도 작품으로 저장하세요.':'✅ 이 작품은 이전 버전 작품이라 장면만 불러왔습니다. 표정·자세·의상을 다시 선택해 새 작품으로 만들 수 있습니다.');
