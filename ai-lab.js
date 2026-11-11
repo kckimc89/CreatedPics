@@ -129,22 +129,86 @@ function markSelection(){
   });
 }
 async function normalize(file){if(!file||!file.type.startsWith('image/'))throw Error('JPG, PNG, WebP 등 이미지 파일을 선택해 주세요.');const url=URL.createObjectURL(file);try{const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('사진을 읽지 못했습니다. HEIC는 사진 앱에서 JPEG로 내보낸 뒤 다시 선택해 주세요.'));i.src=url;});const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.90);}finally{URL.revokeObjectURL(url);}}
-$('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
+$('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
 $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;
   }
   result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요. 사진 앱 저장은 보관 후 작품 메뉴에서도 할 수 있습니다.');
 }catch(err){message('⚠️ '+err.message);}};
-async function copyPrompt(id){const t=$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
+
+// C2.0: child conversation flow. Rule-based, local-only; never sends voice/audio/images to our own backend.
+const studioChatKey='family-creative-chat-url-c20';
+const safeChatUrl=raw=>{try{const u=new URL((raw||'').trim());if(u.protocol!=='https:'||!['chatgpt.com','www.chatgpt.com'].includes(u.hostname)||!/^\/c\/[a-zA-Z0-9_-]+\/?$/.test(u.pathname)||u.search||u.hash)return null;return u.origin+u.pathname;}catch(e){return null;}};
+let studioChatUrl='';try{studioChatUrl=safeChatUrl(localStorage.getItem(studioChatKey))||'';}catch(e){}
+$('chatLink').value=studioChatUrl;
+function setChatStatus(){ $('chatStatus').textContent=studioChatUrl?'✅ 이 기기에서 창작대화방이 연결되었습니다. 만들기 버튼은 이 대화를 엽니다.':'연결된 전용 대화가 없습니다. 만들기 버튼은 ChatGPT 홈을 엽니다.'; }
+setChatStatus();
+$('chatSave').onclick=()=>{const url=safeChatUrl($('chatLink').value);if(!url){$('chatStatus').textContent='⚠️ 올바른 개인 대화 주소(https://chatgpt.com/c/...)만 사용할 수 있습니다. 공유 주소 /share/...는 안 됩니다.';return;}try{localStorage.setItem(studioChatKey,url);studioChatUrl=url;setChatStatus();}catch(e){$('chatStatus').textContent='⚠️ 주소를 이 기기에 저장하지 못했습니다.';}};
+$('chatClear').onclick=()=>{studioChatUrl='';$('chatLink').value='';try{localStorage.removeItem(studioChatKey);}catch(e){}setChatStatus();};
+let storyItems=[],storyConfirmed=false,pendingChoice=null;
+const storyKeys=[['hair','머리'],['clothes','의상'],['expression','표정'],['pose','자세'],['background','배경'],['friends','친구·소품'],['other','그 밖의 이야기']];
+function talkSay(t){if(!('speechSynthesis' in window)){ $('talkStatus').textContent='읽어주기 기능을 사용할 수 없습니다.';return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ko-KR';u.rate=.88;speechSynthesis.speak(u);}catch(e){$('talkStatus').textContent='읽어주기가 동작하지 않습니다.';}}
+let lastAppWords='하고 싶은 것을 말해 주세요. 제가 정리해 줄게요.';
+$('talkSpeak').onclick=()=>talkSay(lastAppWords);
+let speechRecognizer=null;
+const SpeechApi=window.SpeechRecognition||window.webkitSpeechRecognition;
+$('talkStart').onclick=()=>{
+  if(!SpeechApi){$('talkInput').focus();$('talkStatus').textContent='이 iPad에서는 웹 음성 인식이 지원되지 않습니다. 키보드의 🎤 받아쓰기를 눌러 말해 주세요.';return;}
+  if(speechRecognizer){try{speechRecognizer.stop();}catch(e){}return;}
+  try{const r=new SpeechApi();speechRecognizer=r;r.lang='ko-KR';r.interimResults=false;r.continuous=false;r.maxAlternatives=1;
+    $('talkStart').textContent='⏹ 듣기 끝내기';$('talkStart').classList.add('listening');$('talkStatus').textContent='듣고 있어요. 자유롭게 이야기해 주세요.';
+    r.onresult=e=>{const t=e.results?.[0]?.[0]?.transcript||'';$('talkInput').value=($('talkInput').value+' '+t).trim();$('talkStatus').textContent='✅ 말을 적었어요. 「내 말 정리하기」를 눌러 주세요.';};
+    r.onerror=e=>{$('talkStatus').textContent='마이크 인식이 원활하지 않습니다 ('+(e.error||'오류')+'). 키보드의 🎤 받아쓰기를 사용해 주세요.';};
+    r.onend=()=>{speechRecognizer=null;$('talkStart').textContent='🎤 말하기';$('talkStart').classList.remove('listening');};r.start();
+  }catch(e){speechRecognizer=null;$('talkStart').textContent='🎤 말하기';$('talkStart').classList.remove('listening');$('talkStatus').textContent='마이크를 시작하지 못했습니다. 키보드의 🎤 받아쓰기를 사용하세요.';}
+};
+function parseStory(s){
+ const phrases=s.replace(/[.!?\n]+/g,',').replace(/(그리고|그다음|그러고|그런데|그치만|하지만|또|이랑|하고요|랑요|하고)/g,',').split(/[,，]+/).map(x=>x.trim()).filter(Boolean);
+ const out=[];
+ const tests=[['hair',/(머리|양갈래|두갈래|땋|묶|앞머리|파마|단발)/],['clothes',/(옷|드레스|공주|치마|우주복|한복|코트|교복|원피스)/],['expression',/(웃|미소|놀라|표정|찡그|신나)/],['pose',/(뛰|달리|앉|서 있|손.*흔들|손잡|헤엄|수영|날아|날기)/],['background',/(배경|바다|하늘|숲|꽃|성|구름|무지개|우주|별)/],['friends',/(토끼|나비|거북|강아지|고양이|사슴|새|친구|엄마|아빠|가족)/]];
+ for(const p of phrases){let assigned=false;for(const [k,re] of tests){if(re.test(p)){out.push({key:k,text:p.slice(0,100)});assigned=true;break;}}if(!assigned)out.push({key:'other',text:p.slice(0,100)});}
+ return out;
+}
+function renderStory(){const el=$('talkSummary');el.replaceChildren();const title=document.createElement('b');title.textContent=storyConfirmed?'✅ 이렇게 만들기로 했어요':'🎨 내가 이야기한 내용';el.append(title);
+ if(!storyItems.length){const p=document.createElement('p');p.textContent='아직 정리한 이야기가 없어요.';el.append(p);return;}
+ const ul=document.createElement('ul');for(const a of storyItems){const li=document.createElement('li');li.textContent=(storyKeys.find(x=>x[0]===a.key)||['','추가 이야기'])[1]+' · '+a.text;ul.append(li);}el.append(ul);
+ if(storyItems.length>5){const p=document.createElement('p');p.textContent='💡 이야기가 많아요. 중요한 5가지를 먼저 골라 완성하고, 나머지는 GPT에서 더 꾸밀 수 있어요.';el.append(p);}
+}
+function talkCheckConflict(){
+ const pose=storyItems.filter(x=>x.key==='pose').map(x=>x.text).join(' ');
+ if(/(앉)/.test(pose)&&/(뛰|달리)/.test(pose))return ['앉아 있기','뛰기'];
+ if(/(서 있)/.test(pose)&&/(앉)/.test(pose))return ['앉아 있기','서 있기'];
+ return null;
+}
+function askStory(){
+ const options=talkCheckConflict();pendingChoice=options;$('talkQuestion').replaceChildren();
+ if(options){const q=document.createElement('p');q.textContent='앉는 것과 뛰는 것을 모두 말했어요. 어떤 자세로 할까요?';$('talkQuestion').append(q);for(const val of options){const b=document.createElement('button');b.type='button';b.textContent=val;b.onclick=()=>{storyItems=storyItems.filter(x=>x.key!=='pose');storyItems.push({key:'pose',text:val});pendingChoice=null;renderStory();askStory();};$('talkQuestion').append(b);}lastAppWords=q.textContent;}
+ else{const q=document.createElement('p');q.textContent='이렇게 만들까요? 더 이야기해도 좋아요!';$('talkQuestion').append(q);lastAppWords=q.textContent;}
+ $('talkQuestion').classList.remove('hidden');$('talkApprove').classList.remove('hidden');$('talkApprove').disabled=!!options;$('talkRemoveLast').classList.toggle('hidden',!storyItems.length);talkSay(lastAppWords);
+}
+$('talkArrange').onclick=()=>{const t=$('talkInput').value.trim();if(!t){$('talkStatus').textContent='말하기 버튼이나 키보드 받아쓰기로 이야기해 주세요.';return;}const adds=parseStory(t);if(!adds.length)return;
+ // append; last instruction wins for category except friends/background; never silently discard unusual words.
+ for(const item of adds){if(['hair','clothes','expression'].includes(item.key)){storyItems=storyItems.filter(x=>x.key!==item.key);}storyItems.push(item);}storyItems=storyItems.slice(-16);storyConfirmed=false;$('talkInput').value='';renderStory();askStory();$('talkStatus').textContent='이야기를 정리했어요. 틀린 부분이 있다면 더 말해 주세요.';};
+$('talkApprove').onclick=()=>{if(pendingChoice)return;storyConfirmed=true;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');$('talkRemoveLast').classList.add('hidden');lastAppWords='좋아요! 이제 만들기 버튼을 누르면 돼요.';talkSay(lastAppWords);$('talkStatus').textContent='✅ 이야기 확인 완료! 「이 모습으로 만들기」 버튼을 눌러 주세요.';};
+$('talkRemoveLast').onclick=()=>{storyItems.pop();storyConfirmed=false;renderStory();askStory();};
+$('talkReset').onclick=()=>{if(storyItems.length&&!confirm('지금 정리한 이야기만 다시 시작할까요? 기존 작품은 그대로입니다.'))return;storyItems=[];storyConfirmed=false;pendingChoice=null;$('talkInput').value='';$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');$('talkRemoveLast').classList.add('hidden');renderStory();};
+function storyPrompt(){if(!storyItems.length)return '';return '\n\n[아이와 함께 정리한 추가 요청]\n'+storyItems.map((a,i)=>(i+1)+'. '+a.text).join('\n')+'\n기본 장면 지시와 충돌하면 아이가 마지막으로 확인한 추가 요청을 우선해 주세요. 모호한 표현은 임의로 단정하지 말고 창작 대화에서 아이에게 짧게 질문해 주세요. 사진에 요소를 너무 많이 넣어 복잡하게 만들지 마세요.';}
+function getStudioPrompt(){return '[새 창작 작업 시작] 이전에 만든 이미지나 다른 인물의 사진은 이번 작품의 참고로 사용하지 마세요. 이번 메시지에 새로 첨부하는 원본 사진만 인물 참고로 사용하세요.\n\n'+$('prompt').value+storyPrompt();}
+function openStudioChat(){return window.open(studioChatUrl||'https://chatgpt.com/','_blank','noopener,noreferrer');}
+renderStory();
+
+async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){$(id).focus();$(id).select();message('요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
- const t=$('prompt').value;
+ const t=getStudioPrompt();
+ if(pendingChoice){message('먼저 ④ 이야기하며 꾸미기에서 자세를 하나 골라 주세요.');$('talkStudio').scrollIntoView({behavior:'smooth'});return;}
+ if(storyItems.length&&!storyConfirmed){message('먼저 ④에서 「이대로 만들기」를 눌러 이야기를 확인해 주세요.');$('talkStudio').scrollIntoView({behavior:'smooth'});return;}
  if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');$('originalFile').scrollIntoView({behavior:'smooth',block:'center'});return;}
  if(!t){message('먼저 만들고 싶은 작품을 골라 주세요.');return;}
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
  try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(_){}
- const w=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
+ const w=openStudioChat();
  if(copied)message('✅ 요청문을 준비했습니다. ChatGPT에서 같은 원본사진을 넣고 → 붙여넣기 → 보내기 순서로 진행해 주세요.');
  else message('⚠️ ChatGPT는 열었지만 자동 복사가 되지 않았습니다. 부모용 요청문에서 복사해 주세요.');
  if(!w)message('⚠️ 팝업이 막혔습니다. 부모용 영역의 「ChatGPT 열기」를 눌러 주세요.');
@@ -207,7 +271,7 @@ $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message(
   if(duplicate&&!confirm('같은 완성사진이 이미 「'+(duplicate.name||'기존 작품')+'」으로 보관되어 있습니다.\n\n그래도 한 장 더 보관할까요?')){message('중복 보관을 취소했습니다. 기존 작품은 그대로 유지됩니다.');return;}
   saving=true;$('saveResult').disabled=true;const sceneId=$('resultScene').value;const title=$('workTitle').value.trim()||titleFor(sceneId);
   const parentId=repairParent&&works.some(w=>w.id===repairParent)?repairParent:null;
-  const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:currentRecipe(),...(parentId?{parentId}:{})};
+  const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(parentId?{parentId}:{})};
   try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();message('✅ '+title+' 작품을 새로 보관했습니다. 기존 작품은 그대로 유지됩니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
 };
 function selectWork(w){active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);
@@ -215,6 +279,25 @@ function selectWork(w){active=w.id;editMode=true;dirty=false;source=w.original;r
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
   markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
 }
+
+function showVoiceEdit(w,card){
+ repairParent=w.id;repairPromptParent=w.id;
+ for(const e of document.querySelectorAll('.modify-panel'))e.remove();
+ const p=document.createElement('section');p.className='modify-panel';
+ p.innerHTML='<h3>🎤 어떻게 고칠까요?</h3><p class="status">완성된 작품을 GPT 대화방에 첨부한 다음, 말로 정리한 수정 요청을 붙여넣어 주세요.</p><textarea class="talk-input" rows="3" placeholder="예: 머리를 두 갈래로 묶고, 손을 아이 손처럼 자연스럽게 고쳐줘"></textarea><div class="talk-controls"><button type="button" class="button mod-big" data-do="speak">🎤 말하기</button><button type="button" class="button strong mod-big" data-do="go">✨ GPT에서 고치기</button></div><p class="status" data-note>말하기가 안 되면 입력칸에서 키보드 🎤 받아쓰기를 사용하세요.</p>';
+ card.append(p);
+ const input=p.querySelector('textarea'),note=p.querySelector('[data-note]');
+ p.querySelector('[data-do="speak"]').onclick=()=>{if(!SpeechApi){input.focus();note.textContent='키보드의 🎤 받아쓰기를 사용해 주세요.';return;}try{const r=new SpeechApi();r.lang='ko-KR';r.onresult=e=>{input.value=(input.value+' '+e.results[0][0].transcript).trim();note.textContent='✅ 말한 내용을 확인한 뒤 GPT에서 고치기를 눌러 주세요.';};r.onerror=()=>note.textContent='음성 인식이 안 됩니다. 키보드 받아쓰기를 이용해 주세요.';r.start();}catch(e){input.focus();}};
+ p.querySelector('[data-do="go"]').onclick=async()=>{
+ const t=input.value.trim();if(!t){note.textContent='먼저 고치고 싶은 점을 말해 주세요.';return;}
+ const parts=parseStory(t).slice(0,12).map((x,i)=>(i+1)+'. '+x.text).join('\n');
+ const req='첨부한 AI 창작사진 한 장을 수정해 주세요. 새 인물을 만들지 마세요.\n\n[아이가 원하는 수정]\n'+parts+'\n\n[반드시 유지] 동일 인물의 얼굴 특징·나이, 변경 대상으로 지정하지 않은 자세·의상·배경·조명은 최대한 유지하세요. 팔·손·다리 수와 관절 연결을 자연스럽게 확인하세요. 불필요한 인물·워터마크·문자는 넣지 마세요. 사진처럼 사실적인 결과 이미지 한 장을 만들어 주세요.';
+ try{await navigator.clipboard.writeText(req);note.textContent='✅ 수정 요청을 복사했어요. GPT에 현재 완성사진을 첨부하고 붙여넣어 보내세요.';}catch(e){note.textContent='복사가 막혔습니다. 아래 요청문을 길게 눌러 복사하세요.';const ta=document.createElement('textarea');ta.className='talk-input';ta.readOnly=true;ta.value=req;p.append(ta);}
+ try{sessionStorage.setItem('creativeStudioAwaitingResult','1');}catch(e){}
+ openStudioChat();
+ };
+}
+
 async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='string').sort((a,b)=>(b.created||0)-(a.created||0));$('workCount').textContent=`보관된 창작작품 ${works.length}개 · 작품을 누르면 바로 아래에 저장·백업·삭제 메뉴가 나타납니다.`;$('works').replaceChildren();
   for(const w of works){
     const card=document.createElement('div');card.className='work-card';
@@ -230,7 +313,11 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
     one.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('backupOne').click();};
     const del=document.createElement('button');del.type='button';del.className='button danger';del.textContent='🗑 삭제';
     del.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('deleteWork').click();};
-    tools.append(photo,one,del);card.append(b,tools);$('works').append(card);
+    const modify=document.createElement('button');modify.type='button';modify.className='button';modify.textContent='🎤 말로 고치기';
+    modify.onclick=e=>{e.stopPropagation();active=w.id;selectWork(w);showVoiceEdit(w,card);};
+    const redo=document.createElement('button');redo.type='button';redo.className='button';redo.textContent='🔁 다시 만들기';
+    redo.onclick=e=>{e.stopPropagation();active=w.id;$('remakeWork').click();document.querySelector('.studio-hero')?.scrollIntoView({behavior:'smooth'});};
+    tools.append(modify,redo,photo,one,del);card.append(b,tools);$('works').append(card);
   }markSelection();
 }
 $('deleteWork').onclick=async()=>{
