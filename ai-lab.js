@@ -219,7 +219,7 @@ async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).valu
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
  const t=getStudioPrompt();
- if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');$('originalFile').scrollIntoView({behavior:'smooth',block:'center'});return;}
+ if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');if($('twoTabStatus'))$('twoTabStatus').textContent='⬇ 아래 ①에서 원본 사진을 고른 뒤 창작 요청을 복사해 주세요.';return;}
  if(!t){message('먼저 만들고 싶은 작품을 골라 주세요.');return;}
  let copied=false;
  try{await navigator.clipboard.writeText(t);copied=true;}catch(e){try{$('prompt').focus();$('prompt').select();document.execCommand('copy');copied=true;}catch(_){}}
