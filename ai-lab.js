@@ -114,7 +114,7 @@ function view(id,data){const el=$(id);el.replaceChildren();if(!data){const sp=do
 function clearRepair(clearParent=true){if(clearParent)repairParent=null;repairPromptParent=null;$('repairPrompt').value='';$('repairLineage').textContent='수정 전 작품: 선택되지 않음';$('repairCompare').classList.add('hidden');}
 function resetScores(){for(const id of ['face','quality','anatomy','poseScore'])$(id).value='';}
 function newDraft({preserveSource=true,preserveParent=false}={}){
-  active=null;editMode=false;dirty=false;result=null;view('resultView',null);if(!preserveSource){source=null;view('originalView',null);}
+  active=null;editMode=false;dirty=false;result=null;view('resultView',null);resetReviewGuide(false);if(!preserveSource){source=null;view('originalView',null);}
   if(!preserveParent)clearRepair();else{$('repairPrompt').value='';repairPromptParent=null;$('repairCompare').classList.add('hidden');}
   $('workNote').value='';if($('parentExtra'))$('parentExtra').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);showRecipe(null);updateFinalPrompt();
   markSelection();
@@ -133,7 +133,7 @@ $('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value=
 $('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;
   }
-  result=data;view('resultView',result);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요. 사진 앱 저장은 보관 후 작품 메뉴에서도 할 수 있습니다.');
+  result=data;view('resultView',result);resetReviewGuide(true);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요. 사진 앱 저장은 보관 후 작품 메뉴에서도 할 수 있습니다.');
 }catch(err){message('⚠️ '+err.message);}};
 
 // C2.0: child conversation flow. Rule-based, local-only; never sends voice/audio/images to our own backend.
@@ -288,10 +288,10 @@ $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message(
   if(duplicate&&!confirm('같은 완성사진이 이미 「'+(duplicate.name||'기존 작품')+'」으로 보관되어 있습니다.\n\n그래도 한 장 더 보관할까요?')){message('중복 보관을 취소했습니다. 기존 작품은 그대로 유지됩니다.');return;}
   saving=true;$('saveResult').disabled=true;const sceneId=$('resultScene').value;const title=$('workTitle').value.trim()||titleFor(sceneId);
   const parentId=repairParent&&works.some(w=>w.id===repairParent)?repairParent:null;
-  const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(parentId?{parentId}:{})};
+  const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(reviewApproved?{childReview:{version:1,opinion:reviewOpinion.slice(0,800),confirmed:true,created:Date.now()}}:{}),...(parentId?{parentId}:{})};
   try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();message('✅ '+title+' 작품을 새로 보관했습니다. 기존 작품은 그대로 유지됩니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
 };
-function selectWork(w){for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);
+function selectWork(w){for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);resetReviewGuide(false);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);
   if(w.parentId){const parent=works.find(p=>p.id===w.parentId);$('repairLineage').textContent='수정 전 작품: '+(parent?.name||'백업에 없는 작품')+' (수정 관계 기록됨)';}
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
   markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
@@ -448,4 +448,64 @@ $('restore').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if
  try{if(!presetReady)throw Error('조합 저장소 사용 불가');await persistPresets([...presets,...additions]);addedPresets=additions.length;}catch(e){/* works restoration remains successful */}
  }await refresh();message('✅ '+n+'개 작품을 추가 복원했습니다. 기존 작품과 중복 '+skip+'개는 변경하지 않았습니다. 조합 '+addedPresets+'개 추가.');}catch(err){await refresh().catch(()=>{});message('⚠️ 복원 중단: '+err.message+' 기존 작품은 유지됩니다. 일부 새 작품은 복원되었을 수 있습니다.');}};
 showRecipe(null);updateStorageStatus();refresh().catch(()=>message('⚠️ 저장소를 열지 못했습니다. 브라우저 저장 설정을 확인해 주세요.'));
+
+// C2.3 — child-guided evaluation after import. No external calls, no automatic image generation.
+// The original IndexedDB schema, backup version and artwork are left unchanged.
+let reviewApproved=false,reviewOpinion='',reviewMode='';
+const review=$('reviewPanel');
+function reviewStatus(t){$('reviewStatus').textContent=t;}
+function reviewBranch(id){for(const k of ['reviewHappyBox','reviewChangeBox','reviewConfirmation','reviewReady'])$(k).hidden=true;if(id)$(id).hidden=false;}
+function resetReviewGuide(show){
+ reviewApproved=false;reviewOpinion='';reviewMode='';$('reviewWords').value='';$('reviewSummary').textContent='';$('reviewPrompt').value='';
+ for(const b of review.querySelectorAll('[aria-pressed]'))b.setAttribute('aria-pressed','false');
+ reviewBranch(null);review.hidden=!show;reviewStatus(show?'마음에 드는지 먼저 골라 주세요.':'완성사진을 가져온 다음 사용할 수 있어요.');
+}
+function reviewChoose(kind){
+ reviewMode=kind;reviewApproved=false;reviewOpinion='';$('reviewPrompt').value='';
+ for(const [id,value] of [['reviewHappy','happy'],['reviewChange','change'],['reviewSkip','skip']])$(id).setAttribute('aria-pressed',String(kind===value));
+ if(kind==='happy'){reviewBranch('reviewHappyBox');reviewStatus('좋아하는 모습 그대로 보관할 수 있어요.');}
+ else if(kind==='change'){reviewBranch('reviewChangeBox');reviewStatus('어떤 부분을 고칠지 마음껏 이야기해 주세요.');}
+ else {reviewBranch(null);review.hidden=true;reviewStatus('언제든 평가·수정 도우미를 다시 열 수 있어요.');}
+}
+$('reviewHappy').onclick=()=>reviewChoose('happy');
+$('reviewChange').onclick=()=>reviewChoose('change');
+$('reviewSkip').onclick=()=>reviewChoose('skip');
+$('reviewShow').onclick=()=>{if(!result){message('먼저 GPT에서 완성한 사진을 가져와 주세요.');return;}review.hidden=false;review.scrollIntoView({behavior:'smooth',block:'nearest'});};
+$('reviewHide').onclick=()=>{review.hidden=true;};
+review.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{
+ if(reviewMode!=='change')reviewChoose('change');
+ const existing=$('reviewWords').value.trim();$('reviewWords').value=(existing?existing+'\n':'')+b.dataset.review+'을(를) 고치고 싶어요. ';
+ $('reviewWords').focus();reviewApproved=false;$('reviewConfirmation').hidden=true;$('reviewReady').hidden=true;
+});
+$('reviewWords').addEventListener('input',()=>{reviewApproved=false;$('reviewConfirmation').hidden=true;$('reviewReady').hidden=true;});
+$('reviewOrganize').onclick=()=>{
+ if(!result){reviewStatus('먼저 완성사진을 가져와 주세요.');return;}
+ const opinion=$('reviewWords').value.trim();if(!opinion){reviewStatus('고치고 싶은 내용을 한마디라도 이야기해 주세요.');$('reviewWords').focus();return;}
+ reviewOpinion=opinion.slice(0,800);reviewApproved=false;$('reviewReady').hidden=true;
+ $('reviewSummary').textContent='✏️ 고치고 싶은 점\n'+reviewOpinion+'\n\n🔒 다른 부분은 가능한 그대로 두기\n\n이 내용이 맞니?';
+ $('reviewConfirmation').hidden=false;reviewStatus('아이의 말을 그대로 적었어요. 내용이 맞는지 확인해 주세요.');
+};
+$('reviewReset').onclick=()=>{
+ reviewApproved=false;reviewOpinion='';$('reviewWords').value='';$('reviewPrompt').value='';$('reviewConfirmation').hidden=true;$('reviewReady').hidden=true;
+ reviewStatus('다시 편하게 이야기해 주세요.');$('reviewWords').focus();
+};
+$('reviewMore').onclick=()=>{$('reviewConfirmation').hidden=true;$('reviewReady').hidden=true;$('reviewWords').focus();reviewStatus('고치거나 더 이야기해도 돼요.');};
+$('reviewApprove').onclick=()=>{
+ if(!result||!reviewOpinion){reviewStatus('먼저 사진과 수정할 내용을 확인해 주세요.');return;}
+ reviewApproved=true;$('reviewConfirmation').hidden=true;$('reviewReady').hidden=false;
+ $('reviewPrompt').value='[현재 작품 수정 — 새로운 장면 만들기가 아닙니다]\n이번 메시지에 첨부하는 완성 창작사진 한 장을 수정의 기준으로 사용해 주세요. 다른 작품이나 이전 대화의 인물을 섞지 마세요.\n\n[아이가 확인한 수정 요청]\n'+reviewOpinion+'\n\n[유지할 부분]\n아이의 요청에 없는 얼굴 특징, 나이의 인상, 머리, 의상, 자세, 배경, 다른 인물·사물, 사진 구도는 가능한 한 그대로 두세요. 특히 어린아이의 손·발 크기와 신체 비율이 자연스럽도록 하세요.\n\n[진행 규칙]\n요청이 애매하면 이미지를 바로 만들지 말고 아이에게 쉬운 질문 하나만 해 주세요. 이미 충분히 명확하면 요청한 부분을 중심으로 결과 이미지 한 장만 만들어 주세요. 기존 사진과 동일한 모습을 완벽히 보존할 수 없는 한계가 있습니다.';
+ reviewStatus('✅ 아이가 확인했어요. 사진과 요청문을 GPT에 전달하면 돼요. 자동 전송되지는 않아요.');
+};
+$('reviewCopy').onclick=async()=>{
+ if(!reviewApproved){reviewStatus('먼저 수정할 내용을 확인해 주세요.');return;}
+ const t=$('reviewPrompt').value;
+ try{await navigator.clipboard.writeText(t);if(editMode&&active&&works.some(w=>w.id===active))repairParent=active;reviewStatus('✅ 수정 요청을 복사했어요. GPT에 현재 완성사진 한 장과 함께 붙여넣어 주세요.');}
+ catch(e){$('reviewPrompt').closest('details').open=true;$('reviewPrompt').focus();$('reviewPrompt').select();reviewStatus('자동 복사가 안 돼요. 선택된 문장을 직접 복사해 주세요.');}
+};
+$('reviewOpenGPT').onclick=()=>{
+ if(!reviewApproved){reviewStatus('먼저 수정 요청을 확인해 주세요.');return;}
+ if(confirm('이미 GPT 창작방 탭이 열려 있나요?\n열려 있다면 취소를 누르고 기존 탭으로 이동하세요.'))openStudioChatOnce();
+};
+resetReviewGuide(false);
+
 })();
