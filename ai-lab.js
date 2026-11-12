@@ -38,7 +38,12 @@ function update(){$('promptPreview').value=makePrompt();}
 for(const id of ['magicExpression','magicPose','magicOutfit','familyPosition','familyPose','familyOutfit','familyPlace','parentExtra'])$(id).addEventListener('input',update);
 async function copy(t,el){try{await navigator.clipboard.writeText(t);status('✅ 요청문을 복사했습니다. GPT 탭에서 필요한 원본 사진을 직접 첨부해 주세요.','promptStatus');}catch(e){el.focus();el.select();status('⚠️ 자동 복사 권한이 없어 문장을 선택했습니다. 직접 복사해 주세요.','promptStatus');}}
 $('copyPrompt').onclick=()=>{if(mode==='magic'&&!slots.magicSource){status('⚠️ 먼저 아이 사진을 선택해 주세요.','promptStatus');return;}if(mode==='family'&&(!slots.familyTravel||!slots.familyChild)){status('⚠️ 여행사진과 아이 사진 두 장을 선택해 주세요.','promptStatus');return;}copy(makePrompt(),$('promptPreview'));};
-$('openGPT').onclick=()=>{const s=$('chatUrl').value.trim(),safe=/^https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+\/?(?:\?.*)?$/.test(s);window.open(safe?s:'https://chatgpt.com/','_blank','noopener,noreferrer');};
+function showChatGuide(msg){$('chatGuideStatus').textContent=msg;}
+$('openGPT').onclick=()=>{
+  // The user must choose Temporary Chat in the ChatGPT UI. We cannot set or verify it.
+  window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
+  showChatGuide('GPT 창에서 「임시」를 직접 선택해 주세요. 창이 열리지 않으면 팝업 차단을 확인해 주세요. 수정할 때는 같은 창으로 돌아갑니다.');
+};
 
 let reviewApproved=false,reviewOpinion='';
 function resetReviewFlow(){
@@ -139,8 +144,7 @@ $('copyRevision').onclick=async()=>{
 };
 $('openRevisionGPT').onclick=()=>{
   if(!reviewApproved){status('먼저 수정 내용을 확인해 주세요.','reviewStatus');return;}
-  const s=$('chatUrl').value.trim(),safe=/^https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+\/?(?:\?.*)?$/.test(s);
-  window.open(safe?s:'https://chatgpt.com/','_blank','noopener,noreferrer');
+  status('💬 앞서 열어 둔 GPT 임시 채팅 탭으로 직접 이동하세요. 새 채팅은 열지 않습니다.','reviewStatus');
 };
 $('showCompare').onclick=()=>{
   if(!slots.resultFile){status('먼저 완성사진을 가져와 주세요.','reviewStatus');return;}
@@ -153,7 +157,7 @@ function currentOutput(){return slots.afterFile&& !$('compareSection').classList
 function filename(file){const ext=(file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)||[])[1]||file.type.split('/')[1]||'jpg';return sanitize($('workTitle').value|| (mode==='family'?'가족여행':'마법변신'))+'.'+ext.toLowerCase();}
 $('downloadResult').onclick=()=>{const s=currentOutput();if(!s){status('⚠️ 완성사진을 먼저 선택하세요.');return;}const a=document.createElement('a');a.href=s.url;a.download=filename(s.file);document.body.append(a);a.click();a.remove();status('⬇️ 파일 저장을 요청했습니다. 아이패드의 파일 앱에서 저장 여부를 확인해 주세요.');};
 $('shareResult').onclick=async()=>{const s=currentOutput();if(!s)return status('⚠️ 완성사진을 먼저 선택하세요.');if(navigator.share&&navigator.canShare){const f=new File([s.file],filename(s.file),{type:s.file.type||'application/octet-stream'});if(navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:filename(s.file)});return;}catch(e){if(e.name==='AbortError')return;}}}status('이 브라우저에서 사진 공유가 지원되지 않습니다. 파일 저장 버튼을 이용해 주세요.');};
-$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('임시 작업 사진만 비우고 새 작품을 시작할까요? 이 엔진에 영구 저장된 새 사진은 없습니다.'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';$('chatUrl').value='';resetReviewFlow();modeChange('magic');status('✨ 임시 작업 사진을 비웠습니다. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
+$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('완성사진을 사진 앱이나 파일 앱에 저장했나요?\n이제 엔진의 임시 사진을 비우고 새 작품을 시작할까요?\n(ChatGPT 임시 채팅 탭은 직접 닫아야 합니다.)'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';resetReviewFlow();modeChange('magic');showChatGuide('새 작품은 「새 GPT 창작 시작」으로 열고 ChatGPT에서 임시 채팅을 선택해 주세요.');status('✨ 엔진의 임시 사진을 비웠습니다. GPT 임시 채팅 창은 직접 닫아 주세요. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
 window.addEventListener('pagehide',()=>{Object.keys(slots).forEach(release);});
 modeChange('magic');update();
 })();
