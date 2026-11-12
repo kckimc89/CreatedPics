@@ -23,7 +23,7 @@ function setupFile(key,view,after){$(key).addEventListener('change',e=>{const f=
 setupFile('magicSource','magicPreview',()=>{if(mode==='magic')display('basePreview','magicSource');});
 setupFile('familyTravel','travelPreview',()=>{if(mode==='family')display('basePreview','familyTravel');});
 setupFile('familyChild','childPreview');
-setupFile('resultFile','resultPreview',()=>{previousResult=null;previousName='';$('resultArea').classList.remove('hidden');$('reviewEditArea').classList.add('hidden');$('compareSection').classList.add('hidden');status('✅ 결과를 확인하세요. 마음에 들면 파일 또는 사진 앱에 저장해 주세요.');});
+setupFile('resultFile','resultPreview',()=>{previousResult=null;previousName='';$('resultArea').classList.remove('hidden');resetReviewFlow();status('✅ 결과를 확인하세요. 마음에 들면 파일 또는 사진 앱에 저장해 주세요.');});
 setupFile('afterFile','afterPreview',()=>{status('✅ 수정 전후 두 작품을 비교할 수 있습니다.');});
 function modeChange(m){mode=m;$('modeMagic').classList.toggle('active',m==='magic');$('modeFamily').classList.toggle('active',m==='family');$('magicSection').classList.toggle('hidden',m!=='magic');$('familySection').classList.toggle('hidden',m!=='family');display('basePreview',m==='magic'?'magicSource':'familyTravel','기준 사진');update();}
 $('modeMagic').onclick=()=>modeChange('magic');$('modeFamily').onclick=()=>modeChange('family');
@@ -39,20 +39,121 @@ for(const id of ['magicExpression','magicPose','magicOutfit','familyPosition','f
 async function copy(t,el){try{await navigator.clipboard.writeText(t);status('✅ 요청문을 복사했습니다. GPT 탭에서 필요한 원본 사진을 직접 첨부해 주세요.','promptStatus');}catch(e){el.focus();el.select();status('⚠️ 자동 복사 권한이 없어 문장을 선택했습니다. 직접 복사해 주세요.','promptStatus');}}
 $('copyPrompt').onclick=()=>{if(mode==='magic'&&!slots.magicSource){status('⚠️ 먼저 아이 사진을 선택해 주세요.','promptStatus');return;}if(mode==='family'&&(!slots.familyTravel||!slots.familyChild)){status('⚠️ 여행사진과 아이 사진 두 장을 선택해 주세요.','promptStatus');return;}copy(makePrompt(),$('promptPreview'));};
 $('openGPT').onclick=()=>{const s=$('chatUrl').value.trim(),safe=/^https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+\/?(?:\?.*)?$/.test(s);window.open(safe?s:'https://chatgpt.com/','_blank','noopener,noreferrer');};
-$('reviewGood').onclick=()=>{ $('reviewEditArea').classList.add('hidden');$('compareSection').classList.add('hidden');status('😍 마음에 든다면 아래에서 작품을 기기에 저장해 주세요.');};
-$('reviewEdit').onclick=()=>{$('reviewEditArea').classList.remove('hidden');status('✏️ 고치고 싶은 점을 이야기하거나 입력해 주세요.');};
-$('reviewLater').onclick=()=>{$('reviewEditArea').classList.add('hidden');$('compareSection').classList.add('hidden');status('🌈 지금 사진을 저장해 두고 다음에 계속할 수 있어요.');};
-function revisionText(){const words=$('reviewWords').value.trim();return ['[창작사진 수정]','이번 메시지에 첨부한 완성 작품 사진 한 장을 기준으로 수정해 주세요.','수정 요청: '+words,'요청한 부분 이외의 얼굴과 기존 가족, 여행 배경, 구도는 가능한 한 유지해 주세요.','수정 결과는 사진 한 장으로 만들어 주세요.'].join('\n');}
-$('prepareRevision').onclick=()=>{if(!$('reviewWords').value.trim()){status('먼저 수정하고 싶은 점을 이야기해 주세요.');return;} $('revisionPrompt').value=revisionText();$('revisionLabel').classList.remove('hidden');$('revisionActions').classList.remove('hidden');status('📝 내용을 확인하고 고친 다음 GPT에 복사해 주세요.');};
-$('copyRevision').onclick=()=>copy($('revisionPrompt').value,$('revisionPrompt'));
-$('showCompare').onclick=()=>{if(!slots.resultFile){status('먼저 완성사진을 가져와 주세요.');return;}const im=new Image();im.src=slots.resultFile.url;im.alt='수정 전 작품';$('beforePreview').replaceChildren(im);$('compareSection').classList.remove('hidden');};
-$('closeCompare').onclick=()=>$('compareSection').classList.add('hidden');
+
+let reviewApproved=false,reviewOpinion='';
+function resetReviewFlow(){
+  reviewApproved=false;reviewOpinion='';
+  $('reviewWords').value='';
+  $('revisionSummary').value='';
+  $('revisionPrompt').value='';
+  $('reviewHappyBox').classList.add('hidden');
+  $('reviewEditArea').classList.add('hidden');
+  $('reviewConfirmation').classList.add('hidden');
+  $('reviewReady').classList.add('hidden');
+  $('compareSection').classList.add('hidden');
+  placeholder('afterPreview','수정본을 선택해 주세요');
+  $('afterFile').value='';
+  release('afterFile');
+  status('완성사진을 보고 마음에 드는지 먼저 골라 주세요.','reviewStatus');
+}
+function reviewPromptText(opinion){
+  const lines=['[현재 창작사진 수정]','이번에 첨부하는 완성 작품 사진 한 장을 기준으로 수정해 주세요.',''];
+  lines.push('아이가 확인한 수정 의견: '+opinion);
+  lines.push('');
+  if(mode==='family') lines.push('기존 가족 인물, 여행 배경과 전체 구도는 가능한 한 유지해 주세요.');
+  else lines.push('얼굴 인상, 배경과 전체 구도는 가능한 한 유지해 주세요.');
+  lines.push('아이의 얼굴 인상과 어린아이답고 자연스러운 신체 비율을 최대한 유지해 주세요.');
+  lines.push('수정된 창작사진 한 장을 부탁합니다.');
+  return lines.join('\n');
+}
+$('reviewGood').onclick=()=>{resetReviewFlow();$('reviewHappyBox').classList.remove('hidden');status('😍 마음에 든다면 아래에서 작품을 기기에 저장해 주세요.','reviewStatus');status('😍 마음에 든다면 아래에서 작품을 기기에 저장해 주세요.');};
+$('reviewEdit').onclick=()=>{resetReviewFlow();$('reviewEditArea').classList.remove('hidden');status('✏️ 어떤 부분을 고치고 싶은지 편하게 이야기해 주세요.','reviewStatus');status('✏️ 어떤 부분을 고치고 싶은지 편하게 이야기해 주세요.');$('reviewWords').focus();};
+$('reviewLater').onclick=()=>{resetReviewFlow();status('🌈 지금 사진을 저장해 두고 다음에 계속할 수 있어요.','reviewStatus');status('🌈 지금 사진을 저장해 두고 다음에 계속할 수 있어요.');};
+document.querySelectorAll('[data-review]').forEach(btn=>btn.onclick=()=>{
+  if($('reviewEditArea').classList.contains('hidden')) $('reviewEdit').click();
+  const suffix=btn.dataset.review+'을(를) 고치고 싶어요. ';
+  $('reviewWords').value = $('reviewWords').value.trim() ? $('reviewWords').value.trim()+'\n'+suffix : suffix;
+  reviewApproved=false;
+  $('reviewConfirmation').classList.add('hidden');
+  $('reviewReady').classList.add('hidden');
+  $('reviewWords').focus();
+});
+$('reviewWords').addEventListener('input',()=>{
+  reviewApproved=false;
+  $('reviewConfirmation').classList.add('hidden');
+  $('reviewReady').classList.add('hidden');
+  $('revisionPrompt').value='';
+});
+$('prepareRevision').onclick=()=>{
+  const words=$('reviewWords').value.trim();
+  if(!words){status('먼저 고치고 싶은 내용을 이야기해 주세요.','reviewStatus');$('reviewWords').focus();return;}
+  reviewApproved=false;
+  reviewOpinion=words.slice(0,800);
+  $('revisionSummary').value=reviewOpinion;
+  $('reviewConfirmation').classList.remove('hidden');
+  $('reviewReady').classList.add('hidden');
+  status('아이의 말을 그대로 적었어요. 내용이 맞는지 확인해 주세요.','reviewStatus');
+};
+$('revisionSummary').addEventListener('input',()=>{
+  reviewApproved=false;
+  $('reviewReady').classList.add('hidden');
+  $('revisionPrompt').value='';
+  status('문장을 고친 뒤 「응, 이대로!」를 눌러 주세요.','reviewStatus');
+});
+$('reviewReset').onclick=()=>{
+  reviewApproved=false;reviewOpinion='';
+  $('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';
+  $('reviewConfirmation').classList.add('hidden');$('reviewReady').classList.add('hidden');
+  status('다시 편하게 이야기해 주세요.','reviewStatus');$('reviewWords').focus();
+};
+$('reviewMore').onclick=()=>{
+  $('reviewConfirmation').classList.add('hidden');
+  $('reviewReady').classList.add('hidden');
+  status('더 이야기하거나 문장을 고쳐도 돼요.','reviewStatus');
+  $('reviewWords').focus();
+};
+$('reviewApprove').onclick=()=>{
+  const corrected=$('revisionSummary').value.trim();
+  if(!corrected){status('정리된 수정 내용을 한마디라도 적어 주세요.','reviewStatus');$('revisionSummary').focus();return;}
+  reviewOpinion=corrected.slice(0,800);
+  $('reviewWords').value=reviewOpinion;
+  reviewApproved=true;
+  $('reviewConfirmation').classList.add('hidden');
+  $('reviewReady').classList.remove('hidden');
+  $('revisionPrompt').value=reviewPromptText(reviewOpinion);
+  status('✅ 아이가 확인했어요. 수정 요청문과 현재 완성사진을 GPT에 보내면 됩니다.','reviewStatus');
+  status('✅ 수정 요청이 준비되었습니다.','resultStatus');
+};
+$('copyRevision').onclick=async()=>{
+  if(!reviewApproved){status('먼저 수정 내용을 확인해 주세요.','reviewStatus');return;}
+  const text=$('revisionPrompt').value;
+  try{
+    await navigator.clipboard.writeText(text);
+    status('✅ 수정 요청문을 복사했어요. 현재 완성사진 한 장과 함께 GPT에 보내 주세요.','reviewStatus');
+  }catch(e){
+    $('revisionPrompt').closest('details').open=true;
+    $('revisionPrompt').focus();
+    $('revisionPrompt').select();
+    status('자동 복사가 안 돼요. 선택된 문장을 직접 복사해 주세요.','reviewStatus');
+  }
+};
+$('openRevisionGPT').onclick=()=>{
+  if(!reviewApproved){status('먼저 수정 내용을 확인해 주세요.','reviewStatus');return;}
+  const s=$('chatUrl').value.trim(),safe=/^https:\/\/chatgpt\.com\/c\/[a-zA-Z0-9-]+\/?(?:\?.*)?$/.test(s);
+  window.open(safe?s:'https://chatgpt.com/','_blank','noopener,noreferrer');
+};
+$('showCompare').onclick=()=>{
+  if(!slots.resultFile){status('먼저 완성사진을 가져와 주세요.','reviewStatus');return;}
+  const im=new Image();im.src=slots.resultFile.url;im.alt='수정 전 작품';$('beforePreview').replaceChildren(im);$('compareSection').classList.remove('hidden');
+  status('수정본을 가져오면 전후를 비교할 수 있어요.','reviewStatus');
+};
+$('closeCompare').onclick=()=>{$('compareSection').classList.add('hidden');status('비교 화면을 닫았어요.','reviewStatus');};
 function sanitize(s){return (s||'창작사진').replace(/[\\/:*?"<>|\x00-\x1F]/g,'_').trim().slice(0,60)||'창작사진';}
 function currentOutput(){return slots.afterFile&& !$('compareSection').classList.contains('hidden')?slots.afterFile:slots.resultFile;}
 function filename(file){const ext=(file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)||[])[1]||file.type.split('/')[1]||'jpg';return sanitize($('workTitle').value|| (mode==='family'?'가족여행':'마법변신'))+'.'+ext.toLowerCase();}
 $('downloadResult').onclick=()=>{const s=currentOutput();if(!s){status('⚠️ 완성사진을 먼저 선택하세요.');return;}const a=document.createElement('a');a.href=s.url;a.download=filename(s.file);document.body.append(a);a.click();a.remove();status('⬇️ 파일 저장을 요청했습니다. 아이패드의 파일 앱에서 저장 여부를 확인해 주세요.');};
 $('shareResult').onclick=async()=>{const s=currentOutput();if(!s)return status('⚠️ 완성사진을 먼저 선택하세요.');if(navigator.share&&navigator.canShare){const f=new File([s.file],filename(s.file),{type:s.file.type||'application/octet-stream'});if(navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:filename(s.file)});return;}catch(e){if(e.name==='AbortError')return;}}}status('이 브라우저에서 사진 공유가 지원되지 않습니다. 파일 저장 버튼을 이용해 주세요.');};
-$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('임시 작업 사진만 비우고 새 작품을 시작할까요? 이 엔진에 영구 저장된 새 사진은 없습니다.'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';$('chatUrl').value='';$('reviewEditArea').classList.add('hidden');$('compareSection').classList.add('hidden');modeChange('magic');status('✨ 임시 작업 사진을 비웠습니다. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
+$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('임시 작업 사진만 비우고 새 작품을 시작할까요? 이 엔진에 영구 저장된 새 사진은 없습니다.'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';$('chatUrl').value='';resetReviewFlow();modeChange('magic');status('✨ 임시 작업 사진을 비웠습니다. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
 window.addEventListener('pagehide',()=>{Object.keys(slots).forEach(release);});
 modeChange('magic');update();
 })();
