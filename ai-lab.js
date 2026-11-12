@@ -191,7 +191,7 @@ function markSelection(){
   });
 }
 async function normalize(file){if(!file||!file.type.startsWith('image/'))throw Error('JPG, PNG, WebP 등 이미지 파일을 선택해 주세요.');const url=URL.createObjectURL(file);try{const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('사진을 읽지 못했습니다. HEIC는 사진 앱에서 JPEG로 내보낸 뒤 다시 선택해 주세요.'));i.src=url;});const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.90);}finally{URL.revokeObjectURL(url);}}
-$('originalFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
+$('originalFile').onchange=async e=>{if($('freshDraftNote'))$('freshDraftNote').classList.add('hidden');hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
 $('resultFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent||compareBeforeId;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;compareBeforeId=parent;
   }
@@ -278,7 +278,7 @@ if($('openChatOnce'))$('openChatOnce').onclick=()=>{if(confirm('GPT 창작방 �
 updateFinalPrompt();
 
 async function copyPrompt(id){const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 최종 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){const target=id==='prompt'&&$('finalPrompt')?$('finalPrompt'):$(id);target.value=t;target.focus();target.select();message('최종 요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
-$('copyPrompt').onclick=()=>copyPrompt('prompt');
+if($('copyPrompt'))$('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
  const t=getStudioPrompt();
  if(!source){message('먼저 ①에서 원본 사진 한 장을 골라 주세요.');if($('twoTabStatus'))$('twoTabStatus').textContent='⬇ 아래 ①에서 원본 사진을 고른 뒤 창작 요청을 복사해 주세요.';return;}
@@ -351,7 +351,16 @@ $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message(
   saving=true;$('saveResult').disabled=true;const sceneId=$('resultScene').value;const title=$('workTitle').value.trim()||titleFor(sceneId);
   const parentId=(repairParent||compareBeforeId)&&works.some(w=>w.id===(repairParent||compareBeforeId))?(repairParent||compareBeforeId):null;
   const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(reviewApproved?{childReview:{version:1,opinion:reviewOpinion.slice(0,800),confirmed:true,created:Date.now()}}:{}),...(parentId?{parentId}:{})};
-  try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();updateChildCompare();message('✅ '+title+' 작품을 새로 보관했습니다. 기존 작품은 그대로 유지됩니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
+  try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();
+    // After a confirmed database add, clear only the in-memory editing draft.
+    // Stored works, presets, and the backup format are not changed.
+    newDraft({preserveSource:false,preserveParent:false});
+    $('expressionChoice').value='';$('poseChoice').value='';$('clothesChoice').value='';
+    storyItems=[];storyConfirmed=false;renderStory();
+    displayScene('castle',true);setTitleForScene('castle');updateFinalPrompt();
+    $('sourceStatus').textContent='새 작품을 시작하려면 원본 사진을 선택해 주세요.';
+    $('freshDraftNote').classList.remove('hidden');
+    message('✅ '+title+' 작품을 보관했습니다. ⑤번의 미리보기는 비우고 새 작품 준비상태로 돌아왔습니다. 보관된 작품은 ⑥에서 볼 수 있습니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
 };
 function deselectWork(){
   // Only clear the current selection; never touch stored works or the draft image.
@@ -444,7 +453,7 @@ $('remakeWork').onclick=()=>{
 };
 $('updateInfo').onclick=async()=>{if(!active||!editMode){message('먼저 아래 보관함에서 수정할 작품을 선택해 주세요.');return;}const item=works.find(w=>w.id===active);if(!item){message('수정할 작품을 찾지 못했습니다.');return;}
   const updated={...item,scene:$('resultScene').value,name:$('workTitle').value.trim()||titleFor($('resultScene').value),note:$('workNote').value.trim(),face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore')};try{await put(updated);dirty=false;await refresh();message('✅ 작품 정보만 수정했습니다. 원본·결과 사진과 수정 연결 관계는 유지했습니다.');}catch(e){message('⚠️ 작품 정보 수정에 실패했습니다. 먼저 백업해 주세요.');}};
-$('newWork').onclick=()=>{const parent=(repairParent||compareBeforeId)&&works.find(w=>w.id===(repairParent||compareBeforeId));newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
+$('newWork').onclick=()=>{if($('freshDraftNote'))$('freshDraftNote').classList.add('hidden');const parent=(repairParent||compareBeforeId)&&works.find(w=>w.id===(repairParent||compareBeforeId));newDraft({preserveSource:true,preserveParent:!!parent});if(parent){repairParent=parent.id;$('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 수정 결과를 가져오세요.';}message('✅ 원본 사진을 유지하고 새 작품 준비를 시작했습니다. 새 결과를 가져오면 별도 작품으로 저장됩니다.');};
 // C1.4.12: bounded, read-only backup. Existing database names and records stay unchanged.
 function humanBytes(n){return n>=1048576?(n/1048576).toFixed(1)+'MB':(n/1024).toFixed(0)+'KB';}
 function backupPayload(items,ps){return {format:'family-creative-ai-lab',version:1,exportedAt:new Date().toISOString(),items,presets:ps};}
