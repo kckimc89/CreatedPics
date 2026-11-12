@@ -23,19 +23,40 @@ function setupFile(key,view,after){$(key).addEventListener('change',e=>{const f=
 setupFile('magicSource','magicPreview',()=>{if(mode==='magic')display('basePreview','magicSource');});
 setupFile('familyTravel','travelPreview',()=>{if(mode==='family')display('basePreview','familyTravel');});
 setupFile('familyChild','childPreview');
-setupFile('resultFile','resultPreview',()=>{previousResult=null;previousName='';$('resultArea').classList.remove('hidden');resetReviewFlow();status('✅ 결과를 확인하세요. 마음에 들면 파일 또는 사진 앱에 저장해 주세요.');});
+setupFile('resultFile','resultPreview',()=>{previousResult=null;previousName='';$('resultArea').classList.remove('hidden');resetReviewFlow();refreshFamilyReview();status('✅ 결과를 확인하세요. 마음에 들면 파일 또는 사진 앱에 저장해 주세요.');});
 setupFile('afterFile','afterPreview',()=>{status('✅ 수정 전후 두 작품을 비교할 수 있습니다.');});
-function modeChange(m){mode=m;$('modeMagic').classList.toggle('active',m==='magic');$('modeFamily').classList.toggle('active',m==='family');$('magicSection').classList.toggle('hidden',m!=='magic');$('familySection').classList.toggle('hidden',m!=='family');display('basePreview',m==='magic'?'magicSource':'familyTravel','기준 사진');update();}
+function modeChange(m){mode=m;$('modeMagic').classList.toggle('active',m==='magic');$('modeFamily').classList.toggle('active',m==='family');$('magicSection').classList.toggle('hidden',m!=='magic');$('familySection').classList.toggle('hidden',m!=='family');display('basePreview',m==='magic'?'magicSource':'familyTravel','기준 사진');refreshFamilyReview();update();}
 $('modeMagic').onclick=()=>modeChange('magic');$('modeFamily').onclick=()=>modeChange('family');
-function familyKind(k){kind=k;$('kindLandscape').classList.toggle('active',k==='landscape');$('kindGroup').classList.toggle('active',k==='group');$('familyPosition').value=k==='group'?'가족 옆 빈자리':'사진 오른쪽의 빈 공간';update();}
+function familyKind(k){kind=k;$('kindLandscape').classList.toggle('active',k==='landscape');$('kindGroup').classList.toggle('active',k==='group');$('familyPosition').value=k==='group'?'가족 옆 빈자리':'사진 오른쪽의 빈 공간';$('familyGroupOptions').classList.toggle('hidden',k!=='group');refreshFamilyReview();update();}
 $('kindLandscape').onclick=()=>familyKind('landscape');$('kindGroup').onclick=()=>familyKind('group');
 IMAGE_SCENES.forEach(x=>{const b=document.createElement('button');b.type='button';b.className=x.id===scene?'active':'';const im=new Image();im.src=x.img;im.alt='';const label=document.createElement('span');label.textContent=meta[x.id][0];b.append(im,label);b.onclick=()=>{scene=x.id;[...$('sceneCards').children].forEach(el=>el.classList.remove('active'));b.classList.add('active');update();};$('sceneCards').append(b);});
+function refreshFamilyReview(){
+  const visible=mode==='family'&&kind==='group'&&Boolean(slots.resultFile);
+  $('familyResultChecks').classList.toggle('hidden',!visible);
+  $('familyResultChecks').querySelectorAll('.family-check').forEach(x=>x.checked=false);
+}
 function makePrompt(){const extra=$('parentExtra').value.trim();let lines;
 if(mode==='magic'){lines=['[마법 변신 창작사진]','이번에 첨부한 아이 사진 한 장을 참고해 자연스러운 가족 창작사진 한 장을 만들어 주세요.','장면: '+meta[scene][1]+'.','아이의 모습: '+($('magicPose').value||meta[scene][2])+'.','표정: '+($('magicExpression').value||'자연스러운 미소')+'.','의상: '+($('magicOutfit').value||'장면에 어울리는 단정한 옷')+'.','아이의 얼굴 인상과 어린아이답고 자연스러운 신체 비율을 최대한 유지해 주세요.'];}
-else{lines=['[가족여행 창작사진]','첫 번째 첨부사진은 실제 여행사진이고 두 번째는 추가할 아이의 사진입니다.',kind==='group'?'기존 여행사진의 가족 인물, 표정과 풍경을 최대한 유지하면서 아이 한 명을 자연스럽게 추가해 주세요.':'실제 여행사진의 장소와 구도를 최대한 유지하면서 아이 한 명을 자연스럽게 배치해 주세요.','아이의 위치: '+$('familyPosition').value+'.','아이의 모습: '+$('familyPose').value+'.','의상: '+$('familyOutfit').value+'.','빛과 원근감을 여행사진에 자연스럽게 맞추고, 원본 아이의 인상을 유지해 주세요.'];if($('familyPlace').value.trim())lines.splice(3,0,'장소: '+$('familyPlace').value.trim()+'.');}
+else{
+  lines=['[가족여행 창작사진]','사진은 두 장 첨부합니다. 첫 번째는 실제 여행사진(장소·구도 기준), 두 번째는 추가할 아이 한 명의 사진(아이 얼굴 기준)입니다.'];
+  if(kind==='group'){
+    lines.push('목표: 첫 번째 사진 속 기존 가족과 풍경을 최대한 그대로 보존하면서, 두 번째 사진의 아이 한 명만 자연스럽게 추가해 주세요.');
+    lines.push('원본 가족 보호: 기존 가족의 인원수, 얼굴 인상, 표정, 머리모양, 의상, 자세, 위치를 임의로 바꾸거나 지우지 마세요. 가족을 다른 사람으로 재생성하거나 새로운 인물을 추가하지 마세요.');
+    lines.push('아이의 크기: '+$('familyChildScale').value+'.');
+    lines.push('아이의 시선: '+$('familyGaze').value+'.');
+  }else{
+    lines.push('실제 여행사진의 장소와 구도를 최대한 유지하면서 아이 한 명을 자연스럽게 배치해 주세요.');
+  }
+  lines.push('아이의 위치: '+$('familyPosition').value+'.');
+  lines.push('아이의 모습: '+$('familyPose').value+'.');
+  lines.push('의상: '+$('familyOutfit').value+'.');
+  lines.push('아이의 원본 얼굴 인상을 지키고, 사진 속 인물들의 키·빛·그림자·초점·원근감에 맞추어 주세요.');
+  lines.push('원본 사진에 없는 여행지나 건물을 새로 만들지 마세요.');
+  if($('familyPlace').value.trim())lines.splice(3,0,'장소: '+$('familyPlace').value.trim()+'.');
+}
 if(extra)lines.push('추가 요청: '+extra);return lines.join('\n');}
 function update(){$('promptPreview').value=makePrompt();}
-for(const id of ['magicExpression','magicPose','magicOutfit','familyPosition','familyPose','familyOutfit','familyPlace','parentExtra'])$(id).addEventListener('input',update);
+for(const id of ['magicExpression','magicPose','magicOutfit','familyPosition','familyPose','familyOutfit','familyPlace','familyChildScale','familyGaze','parentExtra'])$(id).addEventListener('input',update);
 async function copy(t,el){try{await navigator.clipboard.writeText(t);status('✅ 요청문을 복사했습니다. GPT 탭에서 필요한 원본 사진을 직접 첨부해 주세요.','promptStatus');}catch(e){el.focus();el.select();status('⚠️ 자동 복사 권한이 없어 문장을 선택했습니다. 직접 복사해 주세요.','promptStatus');}}
 $('copyPrompt').onclick=()=>{if(mode==='magic'&&!slots.magicSource){status('⚠️ 먼저 아이 사진을 선택해 주세요.','promptStatus');return;}if(mode==='family'&&(!slots.familyTravel||!slots.familyChild)){status('⚠️ 여행사진과 아이 사진 두 장을 선택해 주세요.','promptStatus');return;}copy(makePrompt(),$('promptPreview'));};
 function showChatGuide(msg){$('chatGuideStatus').textContent=msg;}
@@ -65,7 +86,8 @@ function reviewPromptText(opinion){
   const lines=['[현재 창작사진 수정]','이번에 첨부하는 완성 작품 사진 한 장을 기준으로 수정해 주세요.',''];
   lines.push('아이가 확인한 수정 의견: '+opinion);
   lines.push('');
-  if(mode==='family') lines.push('기존 가족 인물, 여행 배경과 전체 구도는 가능한 한 유지해 주세요.');
+  if(mode==='family'&&kind==='group') lines.push('추가한 아이의 요청 부분만 수정해 주세요. 기존 가족의 얼굴·표정·의상·자세·위치·인원수와 여행 배경은 변경하지 마세요.');
+  else if(mode==='family') lines.push('여행 배경과 전체 구도는 가능한 한 유지해 주세요.');
   else lines.push('얼굴 인상, 배경과 전체 구도는 가능한 한 유지해 주세요.');
   lines.push('아이의 얼굴 인상과 어린아이답고 자연스러운 신체 비율을 최대한 유지해 주세요.');
   lines.push('수정된 창작사진 한 장을 부탁합니다.');
@@ -157,7 +179,7 @@ function currentOutput(){return slots.afterFile&& !$('compareSection').classList
 function filename(file){const ext=(file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)||[])[1]||file.type.split('/')[1]||'jpg';return sanitize($('workTitle').value|| (mode==='family'?'가족여행':'마법변신'))+'.'+ext.toLowerCase();}
 $('downloadResult').onclick=()=>{const s=currentOutput();if(!s){status('⚠️ 완성사진을 먼저 선택하세요.');return;}const a=document.createElement('a');a.href=s.url;a.download=filename(s.file);document.body.append(a);a.click();a.remove();status('⬇️ 파일 저장을 요청했습니다. 아이패드의 파일 앱에서 저장 여부를 확인해 주세요.');};
 $('shareResult').onclick=async()=>{const s=currentOutput();if(!s)return status('⚠️ 완성사진을 먼저 선택하세요.');if(navigator.share&&navigator.canShare){const f=new File([s.file],filename(s.file),{type:s.file.type||'application/octet-stream'});if(navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:filename(s.file)});return;}catch(e){if(e.name==='AbortError')return;}}}status('이 브라우저에서 사진 공유가 지원되지 않습니다. 파일 저장 버튼을 이용해 주세요.');};
-$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('완성사진을 사진 앱이나 파일 앱에 저장했나요?\n이제 엔진의 임시 사진을 비우고 새 작품을 시작할까요?\n(ChatGPT 임시 채팅 탭은 직접 닫아야 합니다.)'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';resetReviewFlow();modeChange('magic');showChatGuide('새 작품은 「새 GPT 창작 시작」으로 열고 ChatGPT에서 임시 채팅을 선택해 주세요.');status('✨ 엔진의 임시 사진을 비웠습니다. GPT 임시 채팅 창은 직접 닫아 주세요. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
+$('clearSession').onclick=()=>{if((Object.values(slots).some(Boolean))&&!confirm('완성사진을 사진 앱이나 파일 앱에 저장했나요?\n이제 엔진의 임시 사진을 비우고 새 작품을 시작할까요?\n(ChatGPT 임시 채팅 탭은 직접 닫아야 합니다.)'))return;Object.keys(slots).forEach(k=>{release(k);$(k).value='';});for(const [id,label] of [['magicPreview','아이 사진'],['travelPreview','여행사진'],['childPreview','아이 사진'],['basePreview','기준 사진'],['resultPreview','완성사진'],['afterPreview','수정 후 사진']])placeholder(id,label);$('resultArea').classList.add('hidden');$('reviewWords').value='';$('revisionSummary').value='';$('revisionPrompt').value='';$('parentExtra').value='';$('workTitle').value='';$('familyPlace').value='';$('familyChildScale').selectedIndex=0;$('familyGaze').selectedIndex=0;resetReviewFlow();refreshFamilyReview();modeChange('magic');showChatGuide('새 작품은 「새 GPT 창작 시작」으로 열고 ChatGPT에서 임시 채팅을 선택해 주세요.');status('✨ 엔진의 임시 사진을 비웠습니다. GPT 임시 채팅 창은 직접 닫아 주세요. 기존 C3.0 작품과 iCloud 자료는 그대로입니다.');};
 window.addEventListener('pagehide',()=>{Object.keys(slots).forEach(release);});
 modeChange('magic');update();
 })();
