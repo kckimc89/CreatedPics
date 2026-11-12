@@ -48,8 +48,11 @@
 .copy-creative-action .button{width:100%;font-size:22px;min-height:65px;border-radius:14px}
 .copy-creative-action .status{margin:8px 0 0}
 .fresh-draft-note{background:#eef9f1;border:1px solid #b8dbc4;border-radius:13px;padding:12px 15px;line-height:1.6;margin:12px 0}
+
+/* C3.0 family-trip module: no external asset or account required */
+.family-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.family-choices button{border:2px solid #e1d4ea;background:#fff;border-radius:15px;padding:18px 9px;font-weight:800;font-size:18px;cursor:pointer}.family-choices button.active{border:3px solid #8653b7;background:#f4e9fc}.family-choices small{display:block;font-weight:400;font-size:13px;margin-top:8px;color:#655769}.family-main-action{width:100%;font-size:19px;min-height:62px;margin-top:12px}.family-work-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}.family-work-actions .button{font-size:13px;min-height:44px}.family-work-card{min-width:0}.family-work-card>button{width:100%;border:2px solid #eadfeb;border-radius:12px;background:#fff;padding:5px;text-align:left}.family-work-card>button.active{border:3px solid #8856ab}.family-work-card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px}.family-work-card small{display:block;padding:6px;line-height:1.4}@media(max-width:680px){.family-choices{grid-template-columns:1fr}.family-work-actions{grid-template-columns:1fr}}
 </style></head><body><header><div><span class="eyebrow">MASTER C2.3 · 간단 요청·자동 비교</span><h1>✨ 가족사진 창작 스튜디오</h1><p>사진을 고르고, 그림과 표정·자세·옷을 선택해서 나만의 작품을 만들어요</p></div><a class="button" href="index.html">← 사진관</a></header>
-<div class="lab"><header class="studio-hero"><h1>🎨 가족사진 창작 스튜디오</h1><p>사진을 고르고 · 기본 모습을 정하고 · GPT와 대화하며 완성해요!</p></header><div class="studio-modes"><button type="button" class="studio-mode on">✨ 마법 변신</button><span>🗺 명소 여행 <small>준비 중</small></span><span>⏳ 타임머신 <small>준비 중</small></span><span>👨‍👩‍👧 가족 여행 <small>준비 중</small></span></div><div class="make-panel compact-gpt">
+<div class="lab"><header class="studio-hero"><h1>🎨 가족사진 창작 스튜디오</h1><p>사진을 고르고 · 기본 모습을 정하고 · GPT와 대화하며 완성해요!</p></header><div class="studio-modes"><button type="button" id="magicModeButton" class="studio-mode on">✨ 마법 변신</button><span>🗺 명소 여행 <small>준비 중</small></span><span>⏳ 타임머신 <small>준비 중</small></span><button type="button" id="familyModeButton" class="studio-mode">👨‍👩‍👧 가족여행 <small>새 창작</small></button></div><div class="make-panel compact-gpt">
 <h2 class="choice-heading">✨ 시작 안내 · GPT 창작방</h2>
 <p class="compact-hint">아래에서 사진과 장면을 준비한 뒤 요청문을 복사해 GPT 창작방에서 완성해요.</p>
 <div class="compact-actions"><button class="button" id="openChatOnce" type="button">💬 GPT 창작방 열기</button></div>
@@ -124,4 +127,37 @@
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">📚 안전한 분할 백업</h3><div class="creative-grid"><label>한 묶음 작품 수<select id="splitSize" class="lab-select"><option value="3">3장씩</option><option value="5">5장씩</option></select></label><div style="display:flex;align-items:end"><button class="button" id="backupSplit" type="button" style="width:100%">📦 다음 묶음 백업</button></div></div><p id="splitStatus" class="status">첫 묶음부터 시작합니다. 한 번 누를 때 파일 하나만 만들어 iPad의 메모리 부담을 줄입니다.</p></div>
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">💾 저장 상태</h3><p id="storageStatus" class="status">브라우저 저장 상태를 확인 중입니다.</p><div class="lab-actions"><button class="button" id="checkStorage" type="button">저장 상태 다시 확인</button></div></div>
 <p class="status">완성작 장기 보관은 사진 앱을 권장합니다. 전체 백업은 메모리 안전 기준을 넘으면 자동 중단하며, 개별·분할 백업이 더 안전합니다.</p>
-</details></div></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C2_3_gallery_intent_1"></script></body></html>
+</details></div>
+<section id="familyModeContent" class="hidden" aria-label="가족여행 창작관">
+  <div class="lab-card"><h2>👨‍👩‍👧 가족여행 · 실제 사진에 아이 초대하기</h2>
+    <p>가족의 실제 여행사진은 그대로 두고, 함께하지 못한 아이가 사진 속에 등장하는 새로운 창작 작품을 만들어요. 원본 파일은 수정하지 않습니다.</p>
+    <div class="family-choices" role="group" aria-label="가족여행 종류">
+      <button id="familyLandscape" type="button" class="active">🌳 풍경 속으로<small>사람 없는 여행 풍경 + 아이</small></button>
+      <button id="familyGroup" type="button">👨‍👩‍👧 가족과 함께<small>가족이 찍힌 여행사진 + 아이</small></button>
+    </div>
+    <div class="lab-grid" style="margin-top:14px">
+      <div><h3>① 실제 여행사진 선택</h3><input id="familyTravelFile" type="file" accept="image/*,.heic,.heif" class="lab-select"><div class="photo-box" id="familyTravelView"><span>실제 여행사진을 선택해 주세요</span></div></div>
+      <div><h3>② 추가할 아이 사진 선택</h3><input id="familyChildFile" type="file" accept="image/*,.heic,.heif" class="lab-select"><div class="photo-box" id="familyChildView"><span>아이 원본사진을 선택해 주세요</span></div></div>
+    </div>
+    <div class="lab-meta" style="margin-top:14px"><h3 class="choice-heading">③ 아이는 어디에 있을까요?</h3>
+      <div class="creative-grid">
+        <label>배치 위치<select id="familyPosition" class="lab-select"><option value="사진 오른쪽의 빈 공간">오른쪽 빈 공간</option><option value="사진 왼쪽의 빈 공간">왼쪽 빈 공간</option><option value="사진 중앙의 자연스러운 빈 공간">가운데 빈 공간</option><option value="기존 가족 옆의 빈 공간">가족 옆</option><option value="기존 가족 사이의 여유 공간">가족 사이</option></select></label>
+        <label>아이 자세<select id="familyPose" class="lab-select"><option value="자연스럽게 서서 카메라를 바라보는 모습">서 있기</option><option value="자연스럽게 걷는 모습">걷기</option><option value="편안히 앉아 있는 모습">앉기</option><option value="가족을 바라보며 미소 짓는 모습">가족 바라보기</option></select></label>
+        <label>의상<select id="familyOutfit" class="lab-select"><option value="아이 원본 사진의 의상을 가능하면 유지">원본 의상 유지</option><option value="여행에 어울리는 단정한 편안한 옷">편안한 여행복</option><option value="기존 가족과 어울리는 단정한 옷">가족과 어울리게</option></select></label>
+      </div>
+      <label>작품 제목<input id="familyTitle" class="lab-select" maxlength="70" placeholder="예: 할머니와 함께한 제주 여행"></label>
+      <details class="advanced"><summary>👩 부모용 · 장소 및 추가 요청</summary><label>장소 이름 (선택)<input id="familyPlace" class="lab-select" maxlength="90" placeholder="예: 제주도 성산일출봉"></label><label>추가 요청 (선택)<textarea id="familyExtra" class="talk-input" rows="2" maxlength="700" placeholder="예: 아이를 할머니 왼쪽에 자연스럽게 서 있게 해 주세요."></textarea></label><textarea id="familyPromptPreview" class="prompt" rows="8" readonly aria-label="가족여행 요청문"></textarea></details>
+      <button id="familyCopyPrompt" type="button" class="button strong family-main-action">📋 가족여행 창작 요청 복사</button>
+      <button id="familyOpenGPT" type="button" class="button">💬 GPT 창작방 열기 · 처음 1회</button>
+      <p class="status">GPT에는 <b>① 여행사진과 ② 아이 사진 두 장</b>을 직접 첨부하고 복사한 요청문을 붙여넣어 주세요. 자동으로 사진을 전송하지 않습니다.</p>
+    </div>
+  </div>
+  <div class="lab-card"><h2>④ 가족여행 완성사진 가져오기</h2>
+    <label for="familyResultFile" class="button strong result-pick" style="display:block;text-align:center">🖼 완성사진 가져오기</label><input id="familyResultFile" type="file" accept="image/*,.heic,.heif" hidden>
+    <div class="lab-grid" style="margin-top:12px"><div><h3>여행 원본</h3><div class="photo-box" id="familySourceCompare"><span>실제 여행사진</span></div></div><div><h3>창작 결과</h3><div class="photo-box" id="familyResultView"><span>아이가 함께한 완성사진</span></div></div></div>
+    <div id="familyRevisionTools" class="hidden"><h3>🔍 수정 전후 비교</h3><p class="status">이미 만든 작품을 수정할 때에는 수정 전 작품 사진 한 장을 GPT에 첨부하세요.</p><label>아이의 수정 의견<textarea id="familyRevisionWords" class="talk-input" rows="2" placeholder="예: 아이를 할머니 옆에 조금 더 가까이 세워줘"></textarea></label><button id="familyRevisionCopy" type="button" class="button strong">📋 수정 요청 복사</button><div class="lab-grid"><div><div class="photo-box" id="familyBeforeView"><span>수정 전</span></div></div><div><div class="photo-box" id="familyAfterView"><span>수정 후 사진을 가져오면 표시됩니다</span></div></div></div><button id="familyCloseCompare" class="button" type="button">비교 닫기</button></div>
+    <div class="lab-actions"><button id="familySave" type="button" class="button strong">❤️ 가족여행 작품 보관</button><button id="familyReset" type="button" class="button">✨ 새 가족여행 시작</button></div>
+    <p id="familyStatus" class="status" role="status">여행사진과 아이 사진을 고른 다음 창작을 시작하세요.</p>
+  </div>
+  <div class="lab-card"><h2>⑤ 우리 가족여행 작품</h2><p class="status">사진을 누르면 작품 관리 메뉴가 나타납니다. 다시 누르면 닫힙니다. 작품을 고치거나 다시 만들 때만 창작 준비 화면으로 불러옵니다.</p><p id="familyWorkCount" class="status"></p><div id="familyWorks" class="works"></div></div>
+</section></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C3_0_family_v1"></script></body></html>
