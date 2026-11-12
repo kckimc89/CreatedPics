@@ -125,11 +125,19 @@ function newDraft({preserveSource=true,preserveParent=false}={}){
   if(!preserveParent)clearRepair();else{$('repairPrompt').value='';repairPromptParent=null;$('repairCompare').classList.add('hidden');}
   $('workNote').value='';if($('parentExtra'))$('parentExtra').value='';resetScores();displayScene(selected,true);setTitleForScene(selected);showRecipe(null);updateFinalPrompt();
   if(!preserveParent){compareBeforeId="";compareBeforeData=null;compareAfterData=null;}else if(repairParent)compareBeforeId=repairParent;
-  markSelection();updateChildCompare();
+  hideChildCompare();markSelection();updateChildCompare();
 }
 // C2.3: child-facing before/after comparison. This only reads existing works;
 // saving remains the existing additive IndexedDB path (never overwrites a parent).
 let compareBeforeId='',compareBeforeData=null,compareAfterData=null;
+function hideChildCompare(){ $('childComparePanel').classList.add('hidden'); }
+function showChildCompare(){
+ if(!compareBeforeData&&result)compareBeforeData=result;
+ $('childComparePanel').classList.remove('hidden');
+ updateChildCompare();
+}
+$('hideChildCompare').onclick=hideChildCompare;
+
 function comparePick(id){
  compareBeforeId=id&&works.some(w=>w.id===id)?id:'';
  const w=works.find(w=>w.id===compareBeforeId);
@@ -169,7 +177,7 @@ $('compareAfterFile').onchange=async e=>{
   compareBeforeId=parent||'';
   repairParent=parent||null;
   result=data;editMode=false;active=null;
-  view('resultView',result);updateChildCompare();markSelection();resetReviewGuide(true);
+  view('resultView',result);showChildCompare();markSelection();resetReviewGuide(true);
   message('✅ 수정 후 사진을 가져왔습니다. 왼쪽의 이전 사진은 그대로이며 수정본은 새 작품으로 보관할 수 있습니다.');
  }catch(err){message('⚠️ '+err.message);}
 };
@@ -183,8 +191,8 @@ function markSelection(){
   });
 }
 async function normalize(file){if(!file||!file.type.startsWith('image/'))throw Error('JPG, PNG, WebP 등 이미지 파일을 선택해 주세요.');const url=URL.createObjectURL(file);try{const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('사진을 읽지 못했습니다. HEIC는 사진 앱에서 JPEG로 내보낸 뒤 다시 선택해 주세요.'));i.src=url;});const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.90);}finally{URL.revokeObjectURL(url);}}
-$('originalFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
-$('resultFile').onchange=async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
+$('originalFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
+$('resultFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent||compareBeforeId;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;compareBeforeId=parent;
   }
   result=data;compareBeforeData=data;compareAfterData=null;view('resultView',result);updateChildCompare();resetReviewGuide(true);$('repairCompare').classList.add('hidden');markSelection();try{sessionStorage.removeItem('creativeStudioAwaitingResult');}catch(_){}$('returnHelper').classList.add('hidden');message('✅ 완성사진을 가져왔습니다. 마음에 들면 「이 작품 보관」을 눌러 주세요. 사진 앱 저장은 보관 후 작품 메뉴에서도 할 수 있습니다.');
@@ -293,7 +301,7 @@ $('returnImport').onclick=()=>{$('returnHelper').classList.add('hidden');$('resu
 if($('returnClose'))$('returnClose').onclick=()=>$('returnHelper').classList.add('hidden');
 showReturnHelper();
 function download(data,name){if(!data){message('먼저 AI 결과를 불러오세요.');return;}const a=document.createElement('a');a.href=data;a.download=name;a.click();}
-function safeImageName(title){return ('가족사진_창작스튜디오_'+(title||'창작사진')).replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+'.jpg';}
+function safeImageName(title){return (title||'창작사진').replace(/[\\/:*?"<>|]/g,'_').trim().slice(0,70)+'.jpg';}
 async function dataUrlToFile(data,name){
   const r=await fetch(data);const blob=await r.blob();
   return new File([blob],name,{type:blob.type||'image/jpeg'});
@@ -345,7 +353,16 @@ $('saveResult').onclick=async()=>{if(saving)return;if(!source||!result){message(
   const item={id:'ai-'+Date.now()+'-'+(crypto.randomUUID?.()||Math.random().toString(36).slice(2)),created:Date.now(),scene:sceneId,name:title,note:$('workNote').value.trim(),original:source,result,face:getScore('face'),quality:getScore('quality'),anatomy:getScore('anatomy'),poseScore:getScore('poseScore'),recipe:{...currentRecipe(),childStory:storyItems.map(x=>({...x})),childStoryConfirmed:storyConfirmed},...(reviewApproved?{childReview:{version:1,opinion:reviewOpinion.slice(0,800),confirmed:true,created:Date.now()}}:{}),...(parentId?{parentId}:{})};
   try{await add(item);active=item.id;editMode=true;repairParent=null;repairPromptParent=null;$('repairLineage').textContent=parentId?'✅ 수정 결과가 별도 작품으로 저장되었습니다.':'수정 전 작품: 없음';await refresh();updateChildCompare();message('✅ '+title+' 작품을 새로 보관했습니다. 기존 작품은 그대로 유지됩니다.');}catch(e){message('⚠️ 저장하지 못했습니다. 저장 공간을 확인하고 결과 사진을 먼저 내보내세요.');}finally{saving=false;$('saveResult').disabled=false;}
 };
-function selectWork(w){for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);resetReviewGuide(false);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);setCompareFromWork(w);
+function deselectWork(){
+  // Only clear the current selection; never touch stored works or the draft image.
+  active=null;editMode=false;
+  for(const panel of document.querySelectorAll('.modify-panel'))panel.remove();
+  hideChildCompare();markSelection();
+  message('작품 선택을 해제했습니다. 다른 작품을 눌러 관리할 수 있습니다.');
+}
+function selectWork(w){
+  if(active===w.id&&editMode){deselectWork();return;}
+  hideChildCompare();for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);resetReviewGuide(false);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);setCompareFromWork(w);
   if(w.parentId){const parent=works.find(p=>p.id===w.parentId);$('repairLineage').textContent='수정 전 작품: '+(parent?.name||'백업에 없는 작품')+' (수정 관계 기록됨)';}
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
   markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
@@ -380,13 +397,24 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
     const del=document.createElement('button');del.type='button';del.className='button danger';del.textContent='🗑 삭제';
     del.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('deleteWork').click();};
     const modify=document.createElement('button');modify.type='button';modify.className='button';modify.textContent='💬 GPT에서 고치기';
-    modify.onclick=e=>{e.stopPropagation();active=w.id;selectWork(w);repairParent=w.id;comparePick(w.id);showVoiceEdit(w,card);};
-    const compareAction=document.createElement('button');compareAction.type='button';compareAction.className='button';compareAction.textContent='🔍 수정 전후 비교';compareAction.onclick=e=>{e.stopPropagation();selectWork(w);repairParent=w.id;comparePick(w.id);$('childComparePanel').scrollIntoView({behavior:'smooth',block:'start'});};
+    modify.onclick=e=>{e.stopPropagation();active=w.id;selectWork(w);repairParent=w.id;comparePick(w.id);showChildCompare();showVoiceEdit(w,card);};
+    const compareAction=document.createElement('button');compareAction.type='button';compareAction.className='button';compareAction.textContent='🔍 수정 전후 비교';compareAction.onclick=e=>{e.stopPropagation();selectWork(w);repairParent=w.id;comparePick(w.id);showChildCompare();$('childComparePanel').scrollIntoView({behavior:'smooth',block:'start'});};
     const redo=document.createElement('button');redo.type='button';redo.className='button';redo.textContent='🔁 다시 만들기';
     redo.onclick=e=>{e.stopPropagation();active=w.id;$('remakeWork').click();document.querySelector('.studio-hero')?.scrollIntoView({behavior:'smooth'});};
     tools.append(modify,compareAction,redo,photo,one,del);card.append(b,tools);$('works').append(card);
-  }markSelection();fillComparePicker();
+   }markSelection();fillComparePicker();
 }
+// Tapping the empty area of the gallery closes the selected work menu.
+$('works').addEventListener('click',e=>{
+  if(e.target===$('works'))deselectWork();
+});
+// Tapping ordinary (noninteractive) blank space outside a work card also closes it.
+document.addEventListener('click',e=>{
+  if(!active||!editMode)return;
+  if(e.target.closest('.work-card,button,a,input,select,textarea,label,summary,details'))return;
+  if(e.target.closest('#works'))return; // empty gallery area handled above
+  deselectWork();
+});
 $('deleteWork').onclick=async()=>{
  if(!active){message('먼저 아래 보관 작품에서 삭제할 작품 한 장을 눌러 주세요.');return;}
  const w=works.find(x=>x.id===active);if(!w){message('선택한 작품을 찾지 못했습니다.');return;}
@@ -518,9 +546,9 @@ function resetReviewGuide(show){
 function reviewChoose(kind){
  reviewMode=kind;reviewApproved=false;reviewOpinion='';$('reviewPrompt').value='';
  for(const [id,value] of [['reviewHappy','happy'],['reviewChange','change'],['reviewSkip','skip']])$(id).setAttribute('aria-pressed',String(kind===value));
- if(kind==='happy'){reviewBranch('reviewHappyBox');reviewStatus('좋아하는 모습 그대로 보관할 수 있어요.');}
- else if(kind==='change'){reviewBranch('reviewChangeBox');reviewStatus('어떤 부분을 고칠지 마음껏 이야기해 주세요.');}
- else {reviewBranch(null);review.hidden=true;reviewStatus('언제든 평가·수정 도우미를 다시 열 수 있어요.');}
+ if(kind==='happy'){hideChildCompare();reviewBranch('reviewHappyBox');reviewStatus('좋아하는 모습 그대로 보관할 수 있어요.');}
+ else if(kind==='change'){showChildCompare();reviewBranch('reviewChangeBox');reviewStatus('어떤 부분을 고칠지 마음껏 이야기해 주세요.');}
+ else {hideChildCompare();reviewBranch(null);review.hidden=true;reviewStatus('언제든 평가·수정 도우미를 다시 열 수 있어요.');}
 }
 $('reviewHappy').onclick=()=>reviewChoose('happy');
 $('reviewChange').onclick=()=>reviewChoose('change');
