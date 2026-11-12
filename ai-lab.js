@@ -369,12 +369,28 @@ function deselectWork(){
   hideChildCompare();markSelection();
   message('작품 선택을 해제했습니다. 다른 작품을 눌러 관리할 수 있습니다.');
 }
-function selectWork(w){
-  if(active===w.id&&editMode){deselectWork();return;}
-  hideChildCompare();for(const e of document.querySelectorAll('.modify-panel'))e.remove();active=w.id;editMode=true;dirty=false;source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);$('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';view('originalView',source);view('resultView',result);resetReviewGuide(false);for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';showRecipe(w);setCompareFromWork(w);
+function selectWork(w,openForRevision=false){
+  // Tapping an archived artwork only opens/closes its management menu.
+  // Do not replace the new-creation draft in section ⑤ unless the user explicitly
+  // chooses GPT edit / before-after comparison / remake.
+  if(!openForRevision){
+    if(active===w.id){deselectWork();return;}
+    for(const panel of document.querySelectorAll('.modify-panel'))panel.remove();
+    active=w.id;editMode=true;dirty=false;
+    hideChildCompare();markSelection();
+    message('보관 작품을 선택했습니다. 사진은 ⑤로 이동하지 않습니다. GPT에서 고치기·수정 전후 비교·다시 만들기를 누르면 수정 준비가 시작됩니다.');
+    return;
+  }
+  for(const panel of document.querySelectorAll('.modify-panel'))panel.remove();
+  active=w.id;editMode=true;dirty=false;
+  source=w.original;result=w.result;clearRepair();displayScene(w.scene,true);
+  $('workTitle').value=w.name||titleFor(w.scene);$('workNote').value=w.note||'';
+  view('originalView',source);view('resultView',result);resetReviewGuide(false);
+  for(const id of ['face','quality','anatomy','poseScore'])$(id).value=w[id]||'';
+  showRecipe(w);setCompareFromWork(w);
   if(w.parentId){const parent=works.find(p=>p.id===w.parentId);$('repairLineage').textContent='수정 전 작품: '+(parent?.name||'백업에 없는 작품')+' (수정 관계 기록됨)';}
   else $('repairLineage').textContent='수정 전 작품: 새 수정 요청문을 만들 수 있습니다.';
-  markSelection();message('보관 작품을 선택했습니다. 정보 수정은 기존 기록만 바꾸고, 새 작품 준비는 기존 사진을 보존합니다.');
+  markSelection();message('선택한 보관 작품을 ⑤에 수정 기준으로 불러왔습니다. 기존 보관 작품은 변경하지 않습니다.');
 }
 
 function showVoiceEdit(w,card){
@@ -406,8 +422,8 @@ async function refresh(){works=(await fetchAll()).filter(x=>x&&typeof x.id==='st
     const del=document.createElement('button');del.type='button';del.className='button danger';del.textContent='🗑 삭제';
     del.onclick=e=>{e.stopPropagation();active=w.id;markSelection();$('deleteWork').click();};
     const modify=document.createElement('button');modify.type='button';modify.className='button';modify.textContent='💬 GPT에서 고치기';
-    modify.onclick=e=>{e.stopPropagation();active=w.id;selectWork(w);repairParent=w.id;comparePick(w.id);showChildCompare();showVoiceEdit(w,card);};
-    const compareAction=document.createElement('button');compareAction.type='button';compareAction.className='button';compareAction.textContent='🔍 수정 전후 비교';compareAction.onclick=e=>{e.stopPropagation();selectWork(w);repairParent=w.id;comparePick(w.id);showChildCompare();$('childComparePanel').scrollIntoView({behavior:'smooth',block:'start'});};
+    modify.onclick=e=>{e.stopPropagation();selectWork(w,true);repairParent=w.id;comparePick(w.id);showChildCompare();showVoiceEdit(w,card);};
+    const compareAction=document.createElement('button');compareAction.type='button';compareAction.className='button';compareAction.textContent='🔍 수정 전후 비교';compareAction.onclick=e=>{e.stopPropagation();selectWork(w,true);repairParent=w.id;comparePick(w.id);showChildCompare();$('childComparePanel').scrollIntoView({behavior:'smooth',block:'start'});};
     const redo=document.createElement('button');redo.type='button';redo.className='button';redo.textContent='🔁 다시 만들기';
     redo.onclick=e=>{e.stopPropagation();active=w.id;$('remakeWork').click();document.querySelector('.studio-hero')?.scrollIntoView({behavior:'smooth'});};
     tools.append(modify,compareAction,redo,photo,one,del);card.append(b,tools);$('works').append(card);
