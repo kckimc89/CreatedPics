@@ -15,14 +15,31 @@ const titles={castle:'꽃길을 달리는 나',ocean:'산호 궁전의 바다 �
 const titleFor=id=>titles[id]||'새로운 환상 작품';
 // C2.4: scene identity added without changing existing IndexedDB schema or backup format.
 scenes.push({id:'family',name:'가족여행 상호작용',scene:'실제 가족여행 사진 속에서 함께하기',desc:'가족과 함께 여행하기',pose:'자연스러운 자세',clothes:'가족과 어울리는 옷',thumb:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#f4e7f5"/><text x="200" y="167" text-anchor="middle" font-size="100">👨‍👩‍👧</text></svg>')});
-let creativeMode='magic', familyChild=null;
+let creativeMode='magic', familyChild=null, familySubmode='add';
 const familyIds=['familyWho','familyAction','familyPosition','familyOutfit','familyExtra'];
 function familyPrompt(){
- const who=$('familyWho').value,act=$('familyAction').value,pos=$('familyPosition').value,outfit=$('familyOutfit').value,extra=$('familyExtra').value.trim();
- return `이번 메시지에 첨부한 사진 두 장으로 자연스러운 가족여행 창작사진 한 장을 만들어 주세요.\n첫 번째는 기존 가족여행 사진이고, 두 번째는 추가할 아이의 사진입니다.\n기존 여행사진 속 사람들은 그대로 두고, 두 번째 사진의 아이 한 명을 추가해 주세요.\n아이는 ${who}와 ${act}를 하는 모습입니다. 위치는 ${pos}, 의상은 ${outfit}입니다.\n원본의 얼굴 인상, 여행 배경과 가족 수를 최대한 유지해 주세요. 인물을 중복하거나 다른 가족을 지우지 말아 주세요.\n${extra?'아이의 추가 요청: '+extra+'\n':''}서로의 크기와 빛이 어울리는 자연스러운 사진으로 부탁합니다.`;
+ const pos=$('familyPosition').value,outfit=$('familyOutfit').value,extra=$('familyExtra').value.trim();
+ const intro=`이번 메시지에 첨부한 사진 두 장을 참고해 자연스러운 가족여행 창작사진 한 장을 만들어 주세요.\n첫 번째 사진은 기존 가족여행 사진, 두 번째 사진은 추가할 아이 사진입니다.\n기존 가족 구성원과 여행 배경은 최대한 유지하고 두 번째 사진의 아이 한 명만 추가해 주세요. 다른 가족을 지우거나 새 인물을 중복해서 만들지 말아 주세요.\n`;
+ const activity=familySubmode==='play'
+  ? `아이가 ${$('familyWho').value}와 ${$('familyAction').value}를 하는 모습으로 자연스럽게 어울리도록 해 주세요.\n`
+  : '아이는 특별한 상호작용 없이 기존 가족사진에 자연스럽게 함께 서 있거나 있는 모습으로 추가해 주세요.\n';
+ return intro+activity+`아이의 위치는 ${pos}, 의상은 ${outfit}입니다.\n가족과 아이의 얼굴 인상, 자연스러운 체형, 사진의 빛과 크기를 최대한 유지해 주세요.\n${extra?'추가 요청: '+extra+'\n':''}완성된 가족 창작사진 한 장을 부탁합니다.`;
+}
+function setFamilySubmode(mode){
+ familySubmode=mode==='play'?'play':'add';
+ const play=familySubmode==='play';
+ $('familyAddMode').classList.toggle('active',!play);
+ $('familyPlayMode').classList.toggle('active',play);
+ $('familyAddMode').setAttribute('aria-pressed',String(!play));
+ $('familyPlayMode').setAttribute('aria-pressed',String(play));
+ document.querySelectorAll('.family-play-only').forEach(el=>el.classList.toggle('hidden',!play));
+ $('familyModeHelp').textContent=play?'함께할 가족과 행동을 고르세요. 기존 가족의 얼굴과 여행 배경은 최대한 유지합니다.':'기존 가족과 여행 배경을 유지하면서 아이 한 명만 자연스럽게 추가합니다.';
+ if(creativeMode==='family')$('workTitle').value=play?'가족과 함께 놀기':'가족여행에 아이 추가하기';
+ updateFamilySummary();
 }
 function updateFamilySummary(){
- $('familySummary').textContent='👨‍👩‍👧 '+$('familyWho').value+'와 '+$('familyAction').value+' · '+$('familyPosition').options[$('familyPosition').selectedIndex].text+'\n'+(familyChild?'✅ 아이 사진 준비됨':'⚠️ 아이 사진을 먼저 골라 주세요.');
+ const activity=familySubmode==='play'?$('familyWho').value+'와 '+$('familyAction').value:'아이만 자연스럽게 추가';
+ $('familySummary').textContent='👨‍👩‍👧 '+activity+' · '+$('familyPosition').options[$('familyPosition').selectedIndex].text+'\n'+(familyChild?'✅ 아이 사진 준비됨':'⚠️ 아이 사진을 먼저 골라 주세요.');
  if(creativeMode==='family'){displayScene('family',true);updateFinalPrompt();}
 }
 function setCreativeMode(mode){
@@ -32,13 +49,13 @@ function setCreativeMode(mode){
  $('familyPanel').classList.toggle('hidden',creativeMode!=='family');$('magicScenePanel').classList.toggle('hidden',creativeMode==='family');
  $('sourceHeading').textContent=creativeMode==='family'?'① 가족여행 사진 고르기':'① 사진 한 장 고르기';
  $('sourceHelp').textContent=creativeMode==='family'?'아이를 추가할 기존 가족여행 사진을 골라 주세요. 원본은 바뀌지 않습니다.':'창작할 가족사진 한 장을 골라 주세요. 원본 사진은 바꾸지 않습니다.';
- if(creativeMode==='family'){selectScene('family');$('workTitle').value='가족과 함께하는 여행';updateFamilySummary();}
+ if(creativeMode==='family'){selectScene('family');setFamilySubmode(familySubmode);}
  else {selectScene('castle');}
  if(result){message('모드를 바꾸었습니다. 앞서 가져온 결과가 남아 있다면 새 작품을 위해 결과 사진을 다시 확인해 주세요.');}
 }
 const sceneFor=id=>scenes.find(s=>s.id===id)||scenes[0];
 function currentRecipe(){
- return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value,parentExtra:$('parentExtra')?.value.trim()||'',...(selected==='family'?{familyInteraction:{who:$('familyWho').value,action:$('familyAction').value,position:$('familyPosition').value,outfit:$('familyOutfit').value,extra:$('familyExtra').value.trim()}}:{})};
+ return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value,parentExtra:$('parentExtra')?.value.trim()||'',...(selected==='family'?{familyInteraction:{mode:familySubmode,who:$('familyWho').value,action:$('familyAction').value,position:$('familyPosition').value,outfit:$('familyOutfit').value,extra:$('familyExtra').value.trim()}}:{})};
 }
 function safeRecipe(r){
  return r&&typeof r==='object'&&r.version===1&&typeof r.scene==='string'&&scenes.some(s=>s.id===r.scene)&&
@@ -50,6 +67,7 @@ function showRecipe(w=null){
  if(!safeRecipe(w.recipe)){el.textContent='이 작품은 레시피 기록 기능 도입 전 작품입니다. 장면 정보만 이용해 다시 만들 수 있습니다.';$('remakeWork').disabled=false;return;}
  const r=w.recipe, labels=[];
  labels.push('장면: '+sceneFor(r.scene).name);
+ if(r.scene==='family'&&r.familyInteraction)labels.push('방식: '+(r.familyInteraction.mode==='add'?'아이 추가하기':'함께 놀기'));
  labels.push('표정: '+(r.expression||'장면 기본'));
  labels.push('자세: '+(r.pose||'장면 기본'));
  labels.push('의상: '+(r.clothes||'장면 기본'));
@@ -286,7 +304,7 @@ $('talkRemoveLast').onclick=()=>{storyItems.pop();storyConfirmed=false;renderSto
 $('talkReset').onclick=()=>{if(storyItems.length&&!confirm('지금 정리한 이야기만 다시 시작할까요? 기존 작품은 그대로입니다.'))return;storyItems=[];storyConfirmed=false;pendingChoice=null;$('talkInput').value='';$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');$('talkRemoveLast').classList.add('hidden');renderStory();};
 function storyPrompt(){if(!storyItems.length)return '';return '\n\n[아이와 함께 정리한 추가 요청]\n'+storyItems.map((a,i)=>(i+1)+'. '+a.text).join('\n')+'\n기본 장면 지시와 충돌하면 아이가 마지막으로 확인한 추가 요청을 우선해 주세요. 모호한 표현은 임의로 단정하지 말고 창작 대화에서 아이에게 짧게 질문해 주세요. 사진에 요소를 너무 많이 넣어 복잡하게 만들지 마세요.';}
 function parentExtraPrompt(){const t=$('parentExtra')?.value.trim()||'';return t?'\n\n[부모 추가 요청]\n'+t+'\n위 추가 요청은 아이의 확정된 선택과 충돌하지 않는 범위에서 반영해 주세요. 충돌한다면 창작 대화에서 짧게 확인해 주세요.':'';}
-function getStudioPrompt(){return creativeMode==='family'?'[가족여행 상호작용 · 새 작품]\n'+familyPrompt()+parentExtraPrompt():'[새 창작사진] 이번 메시지의 첨부 사진을 기준으로 작업해 주세요.\n\n'+$('prompt').value+storyPrompt()+parentExtraPrompt();}
+function getStudioPrompt(){return creativeMode==='family'?(familySubmode==='play'?'[가족여행 · 함께 놀기 · 새 작품]\n':'[가족여행 · 아이 추가하기 · 새 작품]\n')+familyPrompt()+parentExtraPrompt():'[새 창작사진] 이번 메시지의 첨부 사진을 기준으로 작업해 주세요.\n\n'+$('prompt').value+storyPrompt()+parentExtraPrompt();}
 function updateFinalPrompt(){if($('finalPrompt'))$('finalPrompt').value=getStudioPrompt();}
 function openStudioChatOnce(){
   const url='https://chatgpt.com/'; // C2.4 privacy policy: open a fresh chat, never reuse the previously stored fixed link
@@ -437,7 +455,13 @@ $('remakeWork').onclick=()=>{
    for(const id of choiceIds)$(id).value=r[id.replace('Choice','')]||'';
    // explicit mapping because recipe keys are shorter
    $('expressionChoice').value=r.expression||'';$('poseChoice').value=r.pose||'';$('clothesChoice').value=r.clothes||'';
-   selected=r.scene;displayScene(r.scene,true);
+   selected=r.scene;
+   if(r.scene==='family'&&r.familyInteraction){
+     const f=r.familyInteraction;
+     for(const [id,val] of [['familyWho',f.who],['familyAction',f.action],['familyPosition',f.position],['familyOutfit',f.outfit],['familyExtra',f.extra]])if(typeof val==='string'&&$(id))$(id).value=val;
+     setFamilySubmode(f.mode==='add'?'add':'play');
+   }
+   displayScene(r.scene,true);
  }else{
    $('expressionChoice').value='';$('poseChoice').value='';$('clothesChoice').value='';selected=w.scene;displayScene(w.scene,true);
  }
@@ -606,6 +630,8 @@ resetReviewGuide(false);
 // C2.4 interaction controls: all local; second reference photo is kept only in memory.
 $('modeMagic').onclick=()=>setCreativeMode('magic');
 $('modeFamily').onclick=()=>setCreativeMode('family');
+$('familyAddMode').onclick=()=>setFamilySubmode('add');
+$('familyPlayMode').onclick=()=>setFamilySubmode('play');
 $('familyChildFile').onchange=async e=>{
  const f=e.target.files?.[0];e.target.value='';if(!f)return;
  try{const img=await normalize(f);familyChild=img;const node=document.createElement('img');node.src=img;node.alt='추가할 아이 사진 미리보기';$('familyChildPreview').replaceChildren(node);$('familyChildStatus').textContent='✅ 아이 사진을 불러왔습니다. GPT에서는 가족여행 사진과 이 사진 두 장을 직접 첨부해 주세요.';updateFamilySummary();}
