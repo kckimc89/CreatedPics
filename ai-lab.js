@@ -19,11 +19,14 @@ let creativeMode='magic', familyChild=null, familySubmode='add';
 const familyIds=['familyWho','familyAction','familyPosition','familyOutfit','familyExtra'];
 function familyPrompt(){
  const pos=$('familyPosition').value,outfit=$('familyOutfit').value,extra=$('familyExtra').value.trim();
- const intro=`이번 메시지에 첨부한 사진 두 장을 참고해 자연스러운 가족여행 창작사진 한 장을 만들어 주세요.\n첫 번째 사진은 기존 가족여행 사진, 두 번째 사진은 추가할 아이 사진입니다.\n기존 가족 구성원과 여행 배경은 최대한 유지하고 두 번째 사진의 아이 한 명만 추가해 주세요. 다른 가족을 지우거나 새 인물을 중복해서 만들지 말아 주세요.\n`;
+ const protection='[가장 중요한 원칙: 인물은 창작하지 않습니다]\n기존 가족여행 사진의 실제 가족은 바로 그 사람들로 보여야 합니다. 가족의 얼굴형, 눈매, 코, 입, 턱선, 피부 느낌, 머리카락, 나이의 인상을 최대한 유지하고 미화·동안화·얼굴 재해석을 하지 마세요. 두 번째 원본 사진의 아이도 같은 아이로 알아볼 수 있어야 합니다. AI가 전에 생성한 얼굴을 기준으로 삼지 마세요.\n';
+ const base='[사진 역할]\n첫 번째 첨부사진 = 기존 가족여행 원본. 두 번째 첨부사진 = 추가할 아이의 실제 원본. 이 두 장만 참고하세요.\n';
+ const composition='[원본 보존]\n가능하다면 첫 번째 여행사진의 가족 얼굴과 배경을 직접 보존하는 부분 합성을 우선해 주세요. 기존 가족 구성원은 삭제·교체·복제하지 않고 인원수, 얼굴, 위치, 자세, 의상, 구도, 배경을 최대한 그대로 유지하세요. 인물을 추가할 공간만 자연스럽게 편집하고, 전체 장면을 불필요하게 재생성하지 마세요.\n';
+ const child='[추가할 아이]\n두 번째 사진의 아이 한 명만 추가하세요. 얼굴과 실제 나이의 인상 및 어린아이의 자연스러운 몸·손·발 비율을 유지하세요. 주변 가족에 맞는 크기와 원근감, 조명, 그림자를 적용하세요.\n';
  const activity=familySubmode==='play'
-  ? `아이가 ${$('familyWho').value}와 ${$('familyAction').value}를 하는 모습으로 자연스럽게 어울리도록 해 주세요.\n`
-  : '아이는 특별한 상호작용 없이 기존 가족사진에 자연스럽게 함께 서 있거나 있는 모습으로 추가해 주세요.\n';
- return intro+activity+`아이의 위치는 ${pos}, 의상은 ${outfit}입니다.\n가족과 아이의 얼굴 인상, 자연스러운 체형, 사진의 빛과 크기를 최대한 유지해 주세요.\n${extra?'추가 요청: '+extra+'\n':''}완성된 가족 창작사진 한 장을 부탁합니다.`;
+ ? '[함께 놀기]\n아이가 '+$('familyWho').value+'와 '+$('familyAction').value+'를 하는 모습으로 표현해 주세요. 이 상호작용에 꼭 필요한 부분만 바꾸고 다른 가족과 배경은 최대한 보호하세요. 손잡기라면 어른과 아이의 손 크기, 손목 연결, 손가락 방향이 자연스러워야 하며 일부 손가락은 가려져도 괜찮습니다.\n'
+ : '[아이 추가하기]\n아이를 기존 가족사진에 자연스럽게 추가만 하세요. 기존 가족의 자세나 표정을 바꾸거나 손잡기 등 새로운 상호작용을 만들지 마세요.\n';
+ return '[가족 창작사진 한 장 만들기]\n'+base+protection+composition+child+activity+'[선택 사항]\n아이 위치: '+pos+'\n아이 의상: '+outfit+'\n'+(extra?'추가 요청: '+extra+'\n':'')+'[최종 점검]\n첫 번째 사진의 모든 기존 가족이 원래 모습 그대로 보이는지, 두 번째 사진의 아이가 실제 그 아이로 보이는지 우선 확인하세요. 아름답게 꾸미기보다 원본 가족의 동일성이 가장 중요합니다. 허용된 변경 범위 안에서 자연스러운 사실적 창작사진 한 장을 만들어 주세요.';
 }
 function setFamilySubmode(mode){
  familySubmode=mode==='play'?'play':'add';
@@ -89,14 +92,17 @@ function displayScene(id,updateMeta){selected=sceneFor(id).id;const s=sceneFor(s
   if(selected==='family'){ $('sceneDesc').textContent=s.desc; $('prompt').value=familyPrompt(); return; }
   const scene=composeScene(s,pose);
   $('sceneDesc').textContent=pose ? `선택한 배경에서 ${pose} · 직접 선택한 자세를 우선합니다. (장면의 원래 동작은 적용하지 않음)` : s.desc;
-   $('prompt').value=`이번 메시지에 첨부한 사진 한 장만 인물의 참고로 사용해 주세요. 사진 속 아이 한 명이 주인공인 자연스럽고 사실적인 상상 여행 사진을 만들어 주세요. 아이가 같은 사람으로 알아보이도록 원본의 얼굴 인상과 어린이다운 모습을 최대한 유지해 주세요.
+   $('prompt').value=`[상상 여행 창작사진]
+이번 메시지에 첨부한 실제 원본 아이 사진 한 장만 참고해 주세요. 인물은 창작 대상이 아닙니다. 실제 그 아이로 보이는 것이 가장 중요합니다.
 
 장면: ${scene}
-표정: ${expression||'밝고 자연스러운 표정'}
+표정: ${expression||'자연스러운 표정'}
 자세: ${pose||s.pose}
 의상: ${clothes||s.clothes}
 
-직접 선택한 표정·자세·의상을 장면 기본 설정보다 우선해 주세요. 동작이 서로 충돌한다면 선택한 자세만 반영해 주세요. 화면에는 아이 한 명만 표현하고, 손과 발이 자연스럽게 보이도록 해 주세요. 배경과 인물의 빛과 크기가 어울리는 창작사진 한 장을 부탁합니다.`;
+원본 아이의 얼굴형, 눈매, 코, 입, 턱선, 머리카락, 피부 느낌과 실제 나이의 인상을 최대한 유지하세요. 얼굴 미화나 재해석을 하지 마세요. 가능하면 원본 얼굴의 모습을 직접 보존하는 합성을 우선해 주세요.
+선택한 자세·표정·의상이 장면 기본 설정보다 우선하며 충돌하는 동작을 추가하지 마세요. 실제 어린아이의 신체 비율, 손·발 크기와 연결을 자연스럽게 유지하세요.
+인물을 과도하게 키우지 말고 배경의 분위기와 원근감·그림자를 자연스럽게 맞추세요. 과한 홍조나 인위적 조명 효과는 피하세요. 한 장의 사실적인 창작사진으로 완성해 주세요.`;
 }
 function selectScene(id){displayScene(id,true);if(!editMode)setTitleForScene(selected);else dirty=true;updateFinalPrompt();}
 for(const s of scenes){if(s.id==='family'){const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);continue;}const b=document.createElement('button');b.type='button';b.dataset.id=s.id;b.setAttribute('aria-label',s.name);const img=document.createElement('img');img.src=s.thumb;img.alt=s.name;img.loading='lazy';img.onerror=()=>{img.style.display='none';b.classList.add('thumb-failed');};const label=document.createElement('span');label.className='scene-label';label.textContent=s.name;b.append(img,label);b.onclick=()=>selectScene(s.id);$('scenes').append(b);const o=document.createElement('option');o.value=s.id;o.textContent=s.name;$('resultScene').append(o);}
@@ -370,7 +376,7 @@ $('downloadResult').onclick=()=>download(result,safeImageName($('workTitle').val
 const repairPanel=document.createElement('section');repairPanel.className='lab-meta';repairPanel.style.marginTop='14px';repairPanel.innerHTML=`<h3 style="margin:0">🛠️ AI 작품 다시 수정하기 (C1.4.6)</h3><p class="status">보관 작품을 선택한 다음 수정 요청문을 만드세요. 수정 결과는 항상 별도 작품으로 보관합니다.</p><label>수정할 부분<select id="repairType" class="lab-select"><option value="hands">팔·손·손가락 오류</option><option value="face">얼굴 특징 유지</option><option value="expression">표정만 바꾸기</option><option value="clothes">의상만 바꾸기</option><option value="pose">자세만 바꾸기</option><option value="background">배경만 바꾸기</option><option value="custom">직접 입력</option></select></label><label>추가 요청 (선택)<input id="repairDetail" class="lab-select" maxlength="240" placeholder="예: 왼손 손가락을 자연스럽게"></label><div class="lab-actions"><button id="makeRepair" type="button" class="button">🪄 수정 요청문 만들기</button><button id="copyRepair" type="button" class="button">📋 수정 요청문 복사</button></div><textarea id="repairPrompt" class="prompt" readonly placeholder="보관 작품을 선택하고 수정 요청문 만들기를 누르세요."></textarea><div id="repairLineage" class="status">수정 전 작품: 선택되지 않음</div><div class="lab-actions"><button id="compareParent" type="button" class="button">🔎 수정 전후 비교</button></div><div id="repairCompare" class="lab-grid hidden"><div><h3>수정 전 작품</h3><div id="repairBefore" class="photo-box"></div></div><div><h3>수정 후 작품</h3><div id="repairAfter" class="photo-box"></div></div></div><div class="score"><label>손·발 정확성<select id="anatomy" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 정확</option><option value="3">3 · 일부 어색함</option><option value="2">2 · 명확한 오류</option><option value="1">1 · 심각한 오류</option></select></label><label>자세 자연스러움<select id="poseScore" class="lab-select"><option value="">평가 선택</option><option value="5">5 · 자연스러움</option><option value="4">4 · 대체로 자연스러움</option><option value="3">3 · 조금 어색함</option><option value="2">2 · 부자연스러움</option><option value="1">1 · 심각한 오류</option></select></label></div>`;
 $('workNote').closest('.lab-meta').append(repairPanel);
 const repairInstructions={hands:'팔은 정확히 두 개, 손은 정확히 두 개여야 합니다. 중복된 팔·손·손가락을 제거하고 어깨부터 손끝까지 관절과 연결을 자연스럽게 수정해 주세요.',face:'원본 아이의 얼굴형, 눈·코·입의 비율, 나이와 헤어라인을 충실하게 유지하고 달라진 얼굴 특징만 교정해 주세요.',expression:'얼굴의 고유한 특징은 유지하면서 표정만 자연스럽게 바꿔 주세요.',clothes:'아이의 얼굴·자세·배경을 유지하고 의상만 자연스럽게 변경해 주세요.',pose:'아이의 얼굴·의상·배경을 유지하면서 자세만 자연스럽게 변경해 주세요. 신체 구조와 손발 개수를 정확히 지켜 주세요.',background:'아이의 얼굴·표정·의상·자세는 유지하고 배경만 변경해 주세요.',custom:'아래 추가 요청에 적힌 부분만 수정해 주세요.'};
-$('makeRepair').onclick=()=>{const parent=works.find(w=>w.id===active);if(!parent){message('먼저 아래 보관 작품을 선택해 주세요.');return;}repairParent=parent.id;repairPromptParent=parent.id;comparePick(parent.id);const type=$('repairType').value,extra=$('repairDetail').value.trim();$('repairPrompt').value='이번 메시지에 첨부하는 현재 창작사진 한 장을 기준으로 자연스럽게 수정해 주세요.\n\n수정 요청: '+repairInstructions[type]+(extra?'\n추가 의견: '+extra:'')+'\n\n요청하지 않은 얼굴 인상, 장면, 옷, 구도는 가능한 한 유지하고 수정된 창작사진 한 장을 만들어 주세요.';
+$('makeRepair').onclick=()=>{const parent=works.find(w=>w.id===active);if(!parent){message('먼저 아래 보관 작품을 선택해 주세요.');return;}repairParent=parent.id;repairPromptParent=parent.id;comparePick(parent.id);const type=$('repairType').value,extra=$('repairDetail').value.trim();$('repairPrompt').value='[부분 수정 · 인물 동일성 최우선]\n이번에 첨부한 수정 전 창작사진을 기준으로 필요한 부분만 고쳐 주세요. 실제 가족 원본사진이 함께 첨부되었다면 인물 얼굴 판단은 실제 원본을 우선하세요. AI가 만든 얼굴을 새로운 기준 얼굴로 삼지 마세요.\n\n수정 요청: '+repairInstructions[type]+(extra?'\n추가 의견: '+extra:'')+'\n\n변경 요청이 없는 가족의 얼굴형·눈매·코·입·턱선·머리카락·피부 느낌·나이 인상, 인원수, 위치, 의상, 배경과 구도는 최대한 유지하세요. 미화하거나 다른 사람처럼 재생성하지 마세요. 필요한 부분 이외의 전체 재생성은 피하고, 수정본은 새 이미지 한 장으로 제공해 주세요.';
   $('repairLineage').textContent='수정 전 작품: '+(parent.name||'이름 없음')+' · 결과 이미지를 가져오면 새 작품으로 저장';$('repairCompare').classList.add('hidden');message('✅ 수정 요청문이 준비되었습니다. ChatGPT에 수정 전 AI 사진을 첨부해 주세요.');};
 $('copyRepair').onclick=()=>copyPrompt('repairPrompt');
 $('compareParent').onclick=()=>{
@@ -410,7 +416,7 @@ function showVoiceEdit(w,card){
  const note=p.querySelector('[data-note]');
  p.querySelector('[data-do="close"]').onclick=()=>p.remove();
  p.querySelector('[data-do="ready"]').onclick=async()=>{
-   const req='이 작품을 계속 수정하고 싶어요. 같은 인물과 전체 분위기는 유지하고, 지금부터 제가 말하는 수정 요청을 하나씩 반영해 주세요. 매번 기존 결과에서 필요한 부분만 고치고 다른 부분은 최대한 유지해 주세요.';
+   const req='이 작품을 계속 수정하고 싶어요. 실제 가족 원본이 인물의 최종 기준입니다. 가족의 얼굴과 인상을 미화하거나 다른 사람처럼 바꾸지 마세요. 지금부터 제가 말하는 부분만 하나씩 수정하고, 다른 인물과 배경은 최대한 유지해 주세요.';
    try{await navigator.clipboard.writeText(req);note.textContent='✅ 시작 안내를 복사했습니다. 기존 GPT 탭으로 가서 붙여넣고, 이후에는 아이가 마이크로 말하며 수정하면 됩니다.';}catch(e){note.textContent='복사가 되지 않았습니다. GPT 창작방으로 가서 바로 말로 수정 요청을 시작해도 됩니다.';}
  };
 }
@@ -612,7 +618,7 @@ $('reviewApprove').onclick=()=>{
  reviewOpinion=corrected.slice(0,800);$('reviewWords').value=reviewOpinion;
 if(!result||!reviewOpinion){reviewStatus('먼저 사진과 수정할 내용을 확인해 주세요.');return;}
  reviewApproved=true;$('reviewConfirmation').hidden=true;$('reviewReady').hidden=false;
- $('reviewPrompt').value='[현재 창작사진 수정]\n이번에 첨부하는 완성 작품 한 장을 기준으로 수정해 주세요.\n\n아이가 확인한 수정 의견: '+reviewOpinion+'\n\n그 밖의 표정, 얼굴 인상, 의상, 배경과 구도는 가능한 한 유지해 주세요. 바뀐 창작사진 한 장을 부탁합니다.';
+ $('reviewPrompt').value='[아이 의견에 따른 부분 수정]\n이번에 첨부한 수정 전 작품을 기준으로, 아이가 확인한 내용만 수정해 주세요. 실제 가족 원본사진이 함께 있다면 얼굴 동일성은 실제 원본이 최우선입니다.\n\n아이가 확인한 수정 의견: '+reviewOpinion+'\n\n인물은 창작 대상이 아닙니다. 요청하지 않은 얼굴과 나이의 인상, 다른 가족의 모습, 의상, 배경, 구도는 최대한 보존하세요. 미화하거나 다른 인물처럼 바꾸지 말고, 필요한 부분만 고친 사진 한 장을 부탁합니다.';
  reviewStatus('✅ 아이가 확인했어요. 사진과 요청문을 GPT에 전달하면 돼요. 자동 전송되지는 않아요.');
 };
 $('reviewCopy').onclick=async()=>{
