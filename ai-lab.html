@@ -57,7 +57,7 @@
 .family-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.family-choices label{display:grid;gap:7px;font-weight:700}
 .family-summary{background:#faf5ff;border:1px solid #dbc7e9;border-radius:14px;padding:12px;line-height:1.7;margin-top:12px;white-space:pre-wrap}
 @media(max-width:680px){.family-choices{grid-template-columns:1fr}}
-</style></head><body><header><div><span class="eyebrow">MASTER C2.5.4 · 가족여행·타임머신 공통 합성</span><h1>✨ 가족사진 창작 스튜디오</h1><p>사진을 고르고, 그림과 표정·자세·옷을 선택해서 나만의 작품을 만들어요</p></div><a class="button" href="index.html">← 사진관</a></header>
+</style></head><body><header><div><span class="eyebrow">MASTER C2.5.5 · 과거 원본 기준 합성</span><h1>✨ 가족사진 창작 스튜디오</h1><p>사진을 고르고, 그림과 표정·자세·옷을 선택해서 나만의 작품을 만들어요</p></div><a class="button" href="index.html">← 사진관</a></header>
 <div class="lab"><header class="studio-hero"><h1>🎨 가족사진 창작 스튜디오</h1><p>사진을 고르고 · 원본 가족의 얼굴은 지키고 · GPT와 함께 완성해요!</p></header><div class="studio-modes"><button id="modeMagic" type="button" class="studio-mode on" aria-pressed="true">✨ 마법 변신</button><span>🗺 명소 여행 <small>준비 중</small></span><button id="modeTime" type="button" class="studio-mode" aria-pressed="false">⏳ 타임머신 <small>옛날 · 미래 여행</small></button><button id="modeFamily" type="button" class="studio-mode" aria-pressed="false">👨‍👩‍👧 가족 여행 <small>아이 추가 · 함께 놀기</small></button></div><div class="make-panel compact-gpt">
 <h2 class="choice-heading">✨ 시작 안내 · GPT 창작방 연결</h2>
 <p class="compact-hint">먼저 아래에서 사진·장면·모습을 고른 다음 창작 요청을 복사해 GPT에서 완성해요.</p>
@@ -134,8 +134,14 @@
  </label>
  </div>
  <div id="timeMeetFields" class="hidden">
-  <p class="status"><b>①에서 과거의 가족사진을 먼저 고르세요.</b> 과거 사진이 작품의 바탕입니다. 과거의 아이·가족·옷·배경·구도는 그대로 두고, 아래에서 고르는 <b>현재의 아이 한 명만 그 사진 속에 추가</b>합니다. GPT에도 과거 사진을 먼저, 현재 아이 사진을 두 번째로 첨부해 주세요.</p>
-  <label class="family-picker" for="timePresentFile">📷 현재의 아이 사진 고르기</label>
+  <div style="background:#f1edf9;border:2px solid #7652a0;border-radius:16px;padding:14px;margin:12px 0">
+   <p style="margin:0 0 7px"><b>🔒 기준 사진 = ① 과거 가족사진</b></p>
+   <p style="margin:0 0 7px">과거 아이·기존 가족·배경·옷·자세·구도를 그대로 둡니다. <b>이 사진이 완성사진의 바탕입니다.</b></p>
+   <p style="margin:0"><b>➕ 추가할 사람 = ② 현재 아이 한 명</b></p>
+   <p style="margin:7px 0 0">현재 아이의 사진 배경은 사용하지 않습니다. 현재 아이만 과거 사진의 빈 공간에 자연스럽게 넣습니다.</p>
+  </div>
+  <p class="status"><b>GPT 사진 첨부 순서도 동일하게:</b> 과거 사진 먼저 → 현재 아이 사진 나중. 이미지를 올릴 때 다른 작품이나 이전 생성 이미지를 섞지 마세요.</p>
+  <label class="family-picker" for="timePresentFile">📷 ② 추가할 현재 아이 사진 고르기</label>
   <input id="timePresentFile" type="file" accept="image/*,.heic,.heif" hidden>
   <div class="family-photo" id="timePresentPreview"><span>추가할 현재 아이 사진을 골라 주세요</span></div>
   <p class="status" id="timePresentStatus">현재 아이 참고사진은 이 작업 중에만 사용하며, 작품 저장소나 백업에 별도로 저장하지 않습니다.</p>
@@ -150,13 +156,22 @@
      <option value="과거 사진 속 가족 한 사람">과거 사진 속 가족 한 사람</option>
     </select>
    </label>
-   <label>🤝 무엇을 할까?
+   <label>🤝 어떻게 만날까?
     <select id="timeMeetAction" class="lab-select">
+     <option value="아이만 추가하고 원래 사람들의 동작과 표정은 바꾸지 않기">➕ 현재 아이만 추가 (권장)</option>
      <option value="나란히 서서 미소 짓기">나란히 서기</option>
      <option value="서로 바라보며 웃기">서로 보고 웃기</option>
      <option value="손잡고 걷기">손잡고 걷기</option>
      <option value="함께 앉아 이야기하기">함께 앉기</option>
      <option value="나란히 손잡고 사진 찍기">손잡고 사진 찍기</option>
+    </select>
+   </label>
+   <label>📍 현재 아이가 들어갈 자리
+    <select id="timeInsertPosition" class="lab-select">
+     <option value="기존 사람들을 가리지 않는 자연스러운 빈 공간">사진 속 자연스러운 빈 공간</option>
+     <option value="과거 아이의 옆 빈 공간">과거 아이 옆</option>
+     <option value="기존 가족의 옆 빈 공간">기존 가족 옆</option>
+     <option value="사진 앞쪽의 빈 공간">사진 앞쪽</option>
     </select>
    </label>
    <label>🏘️ 어디에서 만날까? (과거 원본 그대로)
@@ -178,7 +193,7 @@
   <label style="display:grid;gap:7px;margin-top:12px;font-weight:700">🎤 더 하고 싶은 말
    <textarea id="timeMeetExtra" class="talk-input" rows="2" maxlength="400" placeholder="예: 어린 엄마랑 손을 잡고 학교 운동장을 걷고 싶어요."></textarea>
   </label>
-  <p class="status">과거 사진에 여러 사람이 있어도 <b>모두 그대로 둡니다.</b> 누구와 상호작용할지만 지정합니다. 과거 사진 속 기존 사람을 삭제하거나 다른 시대로 이동시키지 않습니다.</p>
+  <p class="status"><b>가장 안전한 첫 시험:</b> 「현재 아이만 추가」를 선택합니다. 과거 사진 속 사람·배경의 변화 없이 현재 아이가 들어가는 것을 먼저 확인한 뒤 손잡기 등을 시험합니다.</p>
  </div>
  <div class="family-summary" id="timeSummary" role="status"></div>
  <p class="status">모든 시간여행은 상상 속 창작사진입니다. 실제 가족의 원본 얼굴을 최대한 보존하고 미화하지 않으며, AI가 만든 새 얼굴을 원본으로 삼지 않습니다.</p>
@@ -292,4 +307,4 @@
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">📚 안전한 분할 백업</h3><div class="creative-grid"><label>한 묶음 작품 수<select id="splitSize" class="lab-select"><option value="3">3장씩</option><option value="5">5장씩</option></select></label><div style="display:flex;align-items:end"><button class="button" id="backupSplit" type="button" style="width:100%">📦 다음 묶음 백업</button></div></div><p id="splitStatus" class="status">첫 묶음부터 시작합니다. 한 번 누를 때 파일 하나만 만들어 iPad의 메모리 부담을 줄입니다.</p></div>
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">💾 저장 상태</h3><p id="storageStatus" class="status">브라우저 저장 상태를 확인 중입니다.</p><div class="lab-actions"><button class="button" id="checkStorage" type="button">저장 상태 다시 확인</button></div></div>
 <p class="status">완성작 장기 보관은 사진 앱을 권장합니다. 전체 백업은 메모리 안전 기준을 넘으면 자동 중단하며, 개별·분할 백업이 더 안전합니다.</p>
-</details></div></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C2_5_4_shared_composite"></script></body></html>
+</details></div></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C2_5_5_master_past_composite"></script></body></html>

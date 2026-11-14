@@ -19,44 +19,41 @@ scenes.push({id:'time',name:'타임머신',scene:'선택한 시대의 시간여�
 let creativeMode='magic', familyChild=null, familySubmode='add';
 let timeSubmode='travel', timePresentPhoto=null;
 const familyIds=['familyWho','familyAction','familyPosition','familyOutfit','familyExtra'];
+// C2.5.5 — same one-child insertion contract as the proven family-photo workflow.
+// Only the FIRST attached photo is the output canvas; the SECOND is an identity reference.
 function meetPastPrompt(){
  const who=$('timeMeetWho').value, action=$('timeMeetAction').value;
- const place=$('timeMeetPlace').value, outfit=$('timeMeetOutfit').value;
+ const where=$('timeInsertPosition').value, outfit=$('timeMeetOutfit').value;
  const extra=$('timeMeetExtra').value.trim();
+ const onlyAdd=action.startsWith('아이만 추가하고');
  const holding=action.includes('손잡');
- const touch=holding?`[손잡기 디테일]
-과거 사진에 있는 ${who}의 손과 새로 들어온 현재 아이의 손만 자연스럽게 연결하세요. 필요한 접촉 부위와 팔의 각도만 최소한으로 조정하세요. 각 사람의 원래 나이와 체격에 맞는 손 크기, 자연스러운 손목과 손바닥의 연결, 정확한 손가락 수와 방향을 확인하세요. 보이지 않는 손가락을 억지로 펼치지 마세요. 손을 맞잡기 어렵다면 기존 인물의 얼굴·몸을 크게 다시 만들지 말고, 더 단순한 손잡기 자세를 선택하세요.
-`:``;
- return `[C2.5.2 타임머신 · 과거 사진에 현재 아이 한 명 추가]
-중요: 이것은 과거의 아이를 현재로 데려오는 창작이 아닙니다. 과거 사진이 최종 사진의 바탕입니다. 현재의 아이가 과거 사진 속으로 들어갑니다.
+ const scene=onlyAdd
+  ? `[변경 허용 범위: 아이 추가만]
+사진 1에 원래 있던 인물들은 표정·자세·팔·손·옷·위치를 모두 그대로 유지하세요. 손잡기나 새 동작을 만들지 말고, 사진 2의 현재 아이만 ${where}에 추가하세요.
+`
+  : `[변경 허용 범위: 요청한 상호작용]
+사진 1의 가족은 원래 인물·얼굴·배경을 유지합니다. 사진 2의 현재 아이를 ${where}에 추가하고, 사진 1 속 ${who}와 ${action} 하도록 자연스럽게 표현하세요. 접촉을 위해 꼭 필요한 팔·손만 제한적으로 수정하고, 과거 사람 전체를 다시 그리지 마세요.
+`;
+ const hands=holding?`[손잡기 점검]
+사진 1의 ${who}와 사진 2의 현재 아이가 잡는 두 손만 자연스럽게 맞닿게 하세요. 각자의 원래 나이와 체격에 맞는 손 크기, 손목 연결, 손가락 가림과 방향을 유지하세요. 손을 위해 두 사람의 얼굴·과거 배경을 바꾸지 마세요.
+`:'';
+ return `[가족사진 · 기존 사진에 아이 한 명 추가하기]
+이번 메시지에 첨부한 사진 두 장만 참고하세요. 이전에 생성된 이미지나 다른 사람을 참고하지 마세요.
 
-[사진의 순서와 역할 — 반드시 구분]
-사진 1: 과거의 실제 가족사진. 완성 작품의 배경이자 기준 사진입니다. 이 사진 속 과거의 아이·다른 가족·의상·장소·시대·색감·구도는 최대한 원래 모습 그대로 유지하세요.
-사진 2: 현재 아이의 실제 원본사진. 이 아이 한 명만 사진 1의 공간에 추가하기 위한 인물 참고입니다.
-사진 1을 사진 2의 현재 배경으로 바꾸거나, 과거 사진 속 사람들을 현재 시대로 옮기거나, 사진 1 전체를 현재 풍경으로 재구성하지 마세요.
+[사진 역할 — 이 순서대로 작업]
+사진 1 = 과거의 실제 가족사진. 이 사진이 최종 작품의 유일한 기준 사진이며 완성사진의 바탕·배경·구도입니다.
+사진 2 = 현재 아이의 실제 사진. 오직 추가할 아이의 얼굴과 몸을 참고하기 위한 사진입니다. 사진 2의 배경·시대·주변 인물은 결과에 사용하지 마세요.
 
-[최우선 · 기존 과거 사진 그대로 유지]
-과거 사진에 있는 인물은 모두 원래 그 사람이며, 원래 그 나이 그대로 남아야 합니다. 그들의 얼굴·표정·머리·몸·복장·위치, 기존 인원수와 원래 시대의 풍경·건물·소품·촬영 분위기를 보호하세요. 과거 인물의 나이를 바꾸거나 현재 모습으로 바꾸거나 삭제·복제하지 마세요. 과거 사진에 사람이 여러 명이면 그 사람들은 모두 남깁니다. 새로 추가할 사람은 사진 2의 현재 아이 단 한 명뿐입니다.
-가능하면 과거 사진의 기존 픽셀을 유지한 채 아이를 넣을 영역과 상호작용에 필요한 작은 부분만 합성하세요. 원본 전체의 불필요한 재생성은 피하세요.
+[가장 중요: 사진 1을 사진 2에 합성하지 마세요]
+현재 아이가 과거 사진 속으로 들어가야 합니다. 과거의 아이를 현재 사진 속으로 데려오지 마세요. 과거 사진을 현재 배경으로 교체하거나 사진 2를 바탕으로 전체 장면을 새로 만들지 마세요.
+사진 1에 이미 있는 아이와 다른 가족은 모두 그대로 남겨 주세요. 그들의 실제 얼굴형·눈매·코·입·턱선·머리·표정·나이·옷·자세·위치뿐 아니라 풍경·건물·소품·색감·옛 사진의 촬영 분위기도 최대한 그대로 보존하세요. 삭제·복제·얼굴 재해석·동안화는 금지합니다. 사진 1에 없던 사람은 사진 2의 현재 아이 단 한 명만 추가하세요.
 
-[현재의 아이를 과거 사진으로 추가]
-두 번째 사진의 현재 아이의 실제 얼굴형, 눈매, 코, 입, 턱선, 피부 특징, 머리카락, 현재 나이의 인상을 최대한 유지하세요. 더 어리게, 더 예쁘게, 또는 과거 인물과 비슷한 새로운 얼굴로 만들지 마세요. 과거의 아이와 현재의 아이는 서로 다른 두 시기의 모습이며, '과거의 나'를 고른 경우에도 과거 아이는 원래 사진에 그대로 남고 현재 아이가 한 명 추가됩니다.
-현재 아이의 신체 비율·손발 크기는 현재 원본과 실제 나이에 맞추고, 과거 사진의 카메라 시점·원근감·초점·빛·그림자·색감을 따라 자연스럽게 합성하세요.
-
-[만나는 장면]
-현재 아이가 과거 사진 속 ${who}와 ${action}를 하는 모습입니다.
-장소·배경: ${place}
-의상: ${outfit}
-${extra?`추가 요청: ${extra}\n`:''}
-만나는 사람 ${who}가 누구인지 과거 사진에서 불명확하면 짐작해서 얼굴을 새로 만들지 말고 먼저 확인해 주세요. 배경 선택이 과거 사진의 실제 장소와 충돌한다면, 기존 과거 사진의 장소를 우선 보존하세요. 상호작용을 위해 꼭 필요한 손·팔·시선 부분 이외에는 과거 인물의 자세를 최대한 유지해 주세요.
-${touch}
-[완성 전 점검]
-① 최종 사진의 바탕이 사진 1의 과거 풍경 그대로인가
-② 사진 1의 과거 아이와 기존 가족들이 모두 원래 인상·나이·위치로 남았는가
-③ 사진 2의 현재 아이 단 한 명이 추가되었는가
-④ 과거 아이가 현재로 옮겨지거나 현재 인물로 변하지 않았는가
-⑤ 얼굴 동일성, 손발·원근·그림자·접촉 자세가 자연스러운가
-사진의 화려함보다 실제 가족과 원래 과거 사진의 보존이 중요합니다. 이 작품은 과거에 실제로 찍은 기록이 아닌 상상 속 가족 창작사진입니다.`;
+[추가할 현재 아이]
+사진 2의 바로 그 아이로 알아볼 수 있어야 합니다. 현재 아이의 실제 나이·얼굴·체형·손발 비율을 유지하고, 사진 1의 자연스러운 거리와 카메라 시점·빛·그림자·화질에 맞춰 자연스럽게 넣어 주세요. ${outfit}.
+${scene}${hands}${extra?`[추가 요청]\n${extra}\n`:''}
+[최종 확인]
+최종 사진의 배경과 모든 기존 인물은 사진 1의 모습 그대로여야 합니다. 사진 1의 과거 아이가 사진 2로 이동하거나 현재의 모습으로 변해서는 안 됩니다. 사진 2의 현재 아이 한 명만 새로 들어온 결과를 만들어 주세요.
+가능하다면 사진 1을 직접 보존하는 부분 편집을 우선하고 전체 장면을 다시 그리지 마세요. 자연스러운 사실적 합성 사진 한 장을 부탁합니다.`;
 }
 function clearTimePresentPhoto(){
  timePresentPhoto=null;
@@ -84,7 +81,7 @@ function setTimeSubmode(mode){
 }
 function updateTimeMeetSummary(){
  if(timeSubmode!=='meet')return;
- $('timeSummary').textContent='📷 과거 사진 그대로 + 현재 아이 한 명 · '+$('timeMeetWho').selectedOptions[0].text+
+ $('timeSummary').textContent='🔒 기준: 과거 사진 · ➕ 추가: 현재 아이 한 명 · '+$('timeMeetWho').selectedOptions[0].text+
  ' · '+$('timeMeetAction').selectedOptions[0].text+
  '\n'+(timePresentPhoto?'✅ 현재 아이 사진 준비됨 · 과거 원본을 먼저 첨부':'⚠️ 추가할 현재 아이 사진을 골라 주세요');
  if(creativeMode==='time'){displayScene('time',true);updateFinalPrompt();}
@@ -201,7 +198,7 @@ function setCreativeMode(mode){
 }
 const sceneFor=id=>scenes.find(s=>s.id===id)||scenes[0];
 function currentRecipe(){
- return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value,parentExtra:$('parentExtra')?.value.trim()||'',...(selected==='family'?{familyInteraction:{mode:familySubmode,who:$('familyWho').value,action:$('familyAction').value,position:$('familyPosition').value,outfit:$('familyOutfit').value,extra:$('familyExtra').value.trim()}}:{}),...(selected==='time'?{timeTravel:{mode:timeSubmode,era:$('timeEra').value,action:$('timeAction').value,outfit:$('timeOutfit').value,frame:$('timeFrame').value,extra:$('timeExtra').value.trim(),meetWho:$('timeMeetWho').value,meetAction:$('timeMeetAction').value,meetPlace:$('timeMeetPlace').value,meetOutfit:$('timeMeetOutfit').value,meetExtra:$('timeMeetExtra').value.trim()}}:{})};
+ return {version:1,scene:selected,expression:$('expressionChoice').value,pose:$('poseChoice').value,clothes:$('clothesChoice').value,prompt:$('prompt').value,parentExtra:$('parentExtra')?.value.trim()||'',...(selected==='family'?{familyInteraction:{mode:familySubmode,who:$('familyWho').value,action:$('familyAction').value,position:$('familyPosition').value,outfit:$('familyOutfit').value,extra:$('familyExtra').value.trim()}}:{}),...(selected==='time'?{timeTravel:{mode:timeSubmode,era:$('timeEra').value,action:$('timeAction').value,outfit:$('timeOutfit').value,frame:$('timeFrame').value,extra:$('timeExtra').value.trim(),meetWho:$('timeMeetWho').value,insertPosition:$('timeInsertPosition').value,meetAction:$('timeMeetAction').value,meetPlace:$('timeMeetPlace').value,meetOutfit:$('timeMeetOutfit').value,meetExtra:$('timeMeetExtra').value.trim()}}:{})};
 }
 function safeRecipe(r){
  return r&&typeof r==='object'&&r.version===1&&typeof r.scene==='string'&&scenes.some(s=>s.id===r.scene)&&
@@ -474,7 +471,7 @@ if($('openChatParent'))$('openChatParent').onclick=()=>{if(confirm('GPT 창작�
 if($('openChatOnce'))$('openChatOnce').onclick=()=>{if(confirm('GPT 창작방 탭이 이미 열려 있나요?\n\n이미 열려 있다면 취소를 누르고 기존 GPT 탭으로 이동하세요.\n처음 여는 경우에만 확인을 누르세요.'))openStudioChatOnce();};
 updateFinalPrompt();
 
-async function copyPrompt(id){if(creativeMode==='family'&&(!familyChild||!source)){message('⚠️ 가족여행 사진과 아이 사진 두 장을 먼저 선택해 주세요.');return;}if(creativeMode==='time'&&timeSubmode==='meet'&&(!source||!timePresentPhoto)){message('⚠️ 먼저 과거 가족사진, 다음 현재 아이 사진을 각각 골라 주세요.');return;}const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message('✅ 최종 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){const target=id==='prompt'&&$('finalPrompt')?$('finalPrompt'):$(id);target.value=t;target.focus();target.select();message('최종 요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
+async function copyPrompt(id){if(creativeMode==='family'&&(!familyChild||!source)){message('⚠️ 가족여행 사진과 아이 사진 두 장을 먼저 선택해 주세요.');return;}if(creativeMode==='time'&&timeSubmode==='meet'&&(!source||!timePresentPhoto)){message('⚠️ 먼저 과거 가족사진, 다음 현재 아이 사진을 각각 골라 주세요.');return;}const t=id==='prompt'?getStudioPrompt():$(id).value;if(!t){message('먼저 요청문을 만드세요.');return;}try{await navigator.clipboard.writeText(t);message(creativeMode==='time'&&timeSubmode==='meet'?'✅ 복사했습니다. GPT에 과거 가족사진을 먼저, 현재 아이 사진을 두 번째로 첨부한 뒤 요청문을 붙여 넣으세요.':'✅ 최종 요청문을 복사했습니다. ChatGPT에 해당 사진과 함께 붙여넣으세요.');}catch(e){const target=id==='prompt'&&$('finalPrompt')?$('finalPrompt'):$(id);target.value=t;target.focus();target.select();message('최종 요청문을 선택했습니다. 복사 메뉴를 이용하세요.');}}
 $('copyPrompt').onclick=()=>copyPrompt('prompt');
 $('createInChatGPT').onclick=async()=>{
  const t=getStudioPrompt();
@@ -623,7 +620,7 @@ $('remakeWork').onclick=()=>{
      for(const [id,val] of [['timeEra',t.era],['timeAction',t.action],['timeOutfit',t.outfit],['timeFrame',t.frame],['timeExtra',t.extra]]){
        if(typeof val==='string'&&$(id)&&($(id).tagName==='TEXTAREA'||[...$(id).options].some(o=>o.value===val)))$(id).value=val;
      }
-     for(const [id,val] of [['timeMeetWho',t.meetWho],['timeMeetAction',t.meetAction],['timeMeetPlace',t.meetPlace],['timeMeetOutfit',t.meetOutfit],['timeMeetExtra',t.meetExtra]]){
+     for(const [id,val] of [['timeMeetWho',t.meetWho],['timeInsertPosition',t.insertPosition],['timeMeetAction',t.meetAction],['timeMeetPlace',t.meetPlace],['timeMeetOutfit',t.meetOutfit],['timeMeetExtra',t.meetExtra]]){
        if(typeof val==='string'&&$(id)&&($(id).tagName==='TEXTAREA'||[...$(id).options].some(o=>o.value===val)))$(id).value=val;
      }
      if(creativeMode!=='time')setCreativeMode('time');
@@ -814,7 +811,7 @@ $('timePresentFile').onchange=async e=>{
   updateTimeMeetSummary();
  }catch(err){$('timePresentStatus').textContent='⚠️ '+err.message;}
 };
-for(const id of ['timeMeetWho','timeMeetAction','timeMeetPlace','timeMeetOutfit','timeMeetExtra'])$(id).addEventListener(id==='timeMeetExtra'?'input':'change',updateTimeMeetSummary);
+for(const id of ['timeMeetWho','timeInsertPosition','timeMeetAction','timeMeetPlace','timeMeetOutfit','timeMeetExtra'])$(id).addEventListener(id==='timeMeetExtra'?'input':'change',updateTimeMeetSummary);
 
 for(const id of ['timeEra','timeAction','timeOutfit','timeFrame','timeExtra'])$(id).addEventListener(id==='timeExtra'?'input':'change',updateTimeSummary);
 $('familyAddMode').onclick=()=>setFamilySubmode('add');
