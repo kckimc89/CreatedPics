@@ -57,8 +57,8 @@
 .family-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.family-choices label{display:grid;gap:7px;font-weight:700}
 .family-summary{background:#faf5ff;border:1px solid #dbc7e9;border-radius:14px;padding:12px;line-height:1.7;margin-top:12px;white-space:pre-wrap}
 @media(max-width:680px){.family-choices{grid-template-columns:1fr}}
-</style></head><body><header><div><span class="eyebrow">MASTER C2.4.5 · 첫 창작 정교화</span><h1>✨ 가족사진 창작 스튜디오</h1><p>사진을 고르고, 그림과 표정·자세·옷을 선택해서 나만의 작품을 만들어요</p></div><a class="button" href="index.html">← 사진관</a></header>
-<div class="lab"><header class="studio-hero"><h1>🎨 가족사진 창작 스튜디오</h1><p>사진을 고르고 · 원본 가족의 얼굴은 지키고 · GPT와 함께 완성해요!</p></header><div class="studio-modes"><button id="modeMagic" type="button" class="studio-mode on" aria-pressed="true">✨ 마법 변신</button><span>🗺 명소 여행 <small>준비 중</small></span><span>⏳ 타임머신 <small>준비 중</small></span><button id="modeFamily" type="button" class="studio-mode" aria-pressed="false">👨‍👩‍👧 가족 여행 <small>아이 추가 · 함께 놀기</small></button></div><div class="make-panel compact-gpt">
+</style></head><body><header><div><span class="eyebrow">MASTER C2.5.1 · 과거와 만나기 시험판</span><h1>✨ 가족사진 창작 스튜디오</h1><p>사진을 고르고, 그림과 표정·자세·옷을 선택해서 나만의 작품을 만들어요</p></div><a class="button" href="index.html">← 사진관</a></header>
+<div class="lab"><header class="studio-hero"><h1>🎨 가족사진 창작 스튜디오</h1><p>사진을 고르고 · 원본 가족의 얼굴은 지키고 · GPT와 함께 완성해요!</p></header><div class="studio-modes"><button id="modeMagic" type="button" class="studio-mode on" aria-pressed="true">✨ 마법 변신</button><span>🗺 명소 여행 <small>준비 중</small></span><button id="modeTime" type="button" class="studio-mode" aria-pressed="false">⏳ 타임머신 <small>옛날 · 미래 여행</small></button><button id="modeFamily" type="button" class="studio-mode" aria-pressed="false">👨‍👩‍👧 가족 여행 <small>아이 추가 · 함께 놀기</small></button></div><div class="make-panel compact-gpt">
 <h2 class="choice-heading">✨ 시작 안내 · GPT 창작방 연결</h2>
 <p class="compact-hint">먼저 아래에서 사진·장면·모습을 고른 다음 창작 요청을 복사해 GPT에서 완성해요.</p>
 <div class="compact-actions"><button class="button strong" id="createInChatGPT" type="button">📋 선택 후 창작 요청 복사</button><button class="button" id="openChatOnce" type="button">💬 새 GPT 창작방 열기</button></div>
@@ -88,6 +88,100 @@
  <div class="family-summary" id="familySummary" role="status"></div>
  <div id="familyPrecisionHelp" class="status">첫 작품부터 원본 가족의 얼굴·아이의 신체 비율·손잡는 두 손의 연결이 자연스럽게 나오도록 요청합니다.</div>
  <p class="status">완성 작품은 기존 ⑤에서 가져와 평가하고 보관합니다. 저장되는 기준 원본은 여행사진이며 추가 아이 사진은 작품 기록에 따로 저장하지 않습니다.</p>
+</section>
+<section class="lab-card hidden" id="timePanel" aria-label="타임머신 창작">
+ <h2 class="kid-step">② 타임머신 창작 방식 선택</h2>
+ <div class="family-submodes" role="group" aria-label="타임머신 하위 메뉴">
+  <button id="timeTravelMode" type="button" class="family-submode active" aria-pressed="true">🕰️ 과거·미래로 여행하기<small>원본 한 장으로 시대 여행</small></button>
+  <button id="timeMeetMode" type="button" class="family-submode" aria-pressed="false">👧 과거와 만나기<small>지금의 나와 옛날 가족이 함께</small></button>
+ </div>
+ <div id="timeTravelFields">
+ <p class="status">①에서 실제 아이 또는 가족사진 한 장을 고른 뒤, 시간여행할 시대를 선택하세요. 원본 얼굴을 최대한 보존합니다.</p>
+ <div class="creative-grid">
+  <label>🕰️ 시대와 장소
+   <select id="timeEra" class="lab-select">
+    <option value="조선시대 궁궐 정원과 돌길">🏯 조선시대 궁궐</option>
+    <option value="1980년대 대한민국의 옛 골목과 가게">🏘️ 1980년대 골목</option>
+    <option value="1980년대 한국의 오래된 초등학교 교실">🏫 옛날 교실</option>
+    <option value="미래의 아름다운 우주도시와 관찰 전망대">🚀 미래 우주도시</option>
+   </select>
+  </label>
+  <label>🧍 무엇을 할까?
+   <select id="timeAction" class="lab-select">
+    <option value="자연스럽게 서서 주변을 둘러보기">서서 둘러보기</option>
+    <option value="가족과 나란히 천천히 걷기">가족과 걷기</option>
+    <option value="주변을 신기하게 바라보며 웃기">신기하게 바라보기</option>
+    <option value="카메라를 바라보며 자연스럽게 미소 짓기">사진 찍기</option>
+   </select>
+  </label>
+  <label>👗 어떤 옷을 입을까?
+   <select id="timeOutfit" class="lab-select">
+    <option value="원본 사진의 의상을 유지">원본 의상 그대로</option>
+    <option value="해당 시대에 맞는 자연스러운 옷으로 의상만 변경">시대에 맞는 옷</option>
+    <option value="단정하고 편안한 복장으로 의상만 변경">편안한 옷</option>
+   </select>
+  </label>
+  <label>🖼️ 사진 구도
+   <select id="timeFrame" class="lab-select">
+    <option value="원본 인물의 얼굴이 알아보기 쉽고 배경도 넓게 보이는 자연스러운 구도">사람과 배경 함께</option>
+    <option value="배경을 넓게 보여 주되 인물은 너무 커지지 않게, 가능하면 가로 7:5">넓은 7:5 구도</option>
+    <option value="기존 사진과 최대한 가까운 인물 위치와 구도">원본 구도 유지</option>
+   </select>
+  </label>
+ </div>
+ <label style="display:grid;gap:7px;margin-top:12px;font-weight:700">🎤 내가 하고 싶은 말
+  <textarea id="timeExtra" class="talk-input" rows="2" maxlength="400" placeholder="예: 엄마랑 조선시대 궁궐을 구경하고 싶어요."></textarea>
+ </label>
+ </div>
+ <div id="timeMeetFields" class="hidden">
+  <p class="status"><b>사진 두 장이 필요합니다.</b> ①에서 현재의 아이 사진을 고르고, 아래에서 과거의 가족사진을 선택해 주세요. GPT에는 두 장을 직접 첨부합니다.</p>
+  <label class="family-picker" for="timePastFile">📷 과거의 가족사진 고르기</label>
+  <input id="timePastFile" type="file" accept="image/*,.heic,.heif" hidden>
+  <div class="family-photo" id="timePastPreview"><span>과거의 가족사진을 골라 주세요</span></div>
+  <p class="status" id="timePastStatus">과거 사진은 이 작업 중에만 미리보기로 사용하며, 작품 저장소나 백업에 별도로 저장하지 않습니다.</p>
+  <div class="creative-grid">
+   <label>👧 누구를 만날까?
+    <select id="timeMeetWho" class="lab-select">
+     <option value="어린 시절의 엄마">어린 시절의 엄마</option>
+     <option value="어린 시절의 아빠">어린 시절의 아빠</option>
+     <option value="과거의 나">과거의 나</option>
+     <option value="어린 시절의 할머니">어린 시절의 할머니</option>
+     <option value="어린 시절의 할아버지">어린 시절의 할아버지</option>
+     <option value="과거 사진 속 가족 한 사람">과거 사진 속 가족 한 사람</option>
+    </select>
+   </label>
+   <label>🤝 무엇을 할까?
+    <select id="timeMeetAction" class="lab-select">
+     <option value="나란히 서서 미소 짓기">나란히 서기</option>
+     <option value="서로 바라보며 웃기">서로 보고 웃기</option>
+     <option value="손잡고 걷기">손잡고 걷기</option>
+     <option value="함께 앉아 이야기하기">함께 앉기</option>
+     <option value="나란히 손잡고 사진 찍기">손잡고 사진 찍기</option>
+    </select>
+   </label>
+   <label>🏘️ 어디에서 만날까?
+    <select id="timeMeetPlace" class="lab-select">
+     <option value="두 번째 과거 사진에 보이는 실제 장소와 분위기를 가능한 한 유지">옛 사진 속 그 장소</option>
+     <option value="1980년대 대한민국의 자연스러운 옛 골목">1980년대 골목</option>
+     <option value="옛날 대한민국의 초등학교 교정">옛날 학교</option>
+     <option value="햇살 좋은 자연스러운 옛날 공원">옛날 공원</option>
+    </select>
+   </label>
+   <label>👗 두 사람의 옷
+    <select id="timeMeetOutfit" class="lab-select">
+     <option value="두 원본 사진의 의상을 최대한 유지">원본 옷 유지</option>
+     <option value="현재 아이의 옷만 과거 장소에 어울리게 변경하고 과거 인물 의상은 유지">현재 아이만 시대에 맞추기</option>
+     <option value="얼굴은 그대로 보존하고 두 사람의 의상만 옛 장소에 어울리게 변경">두 사람 모두 시대에 맞추기</option>
+    </select>
+   </label>
+  </div>
+  <label style="display:grid;gap:7px;margin-top:12px;font-weight:700">🎤 더 하고 싶은 말
+   <textarea id="timeMeetExtra" class="talk-input" rows="2" maxlength="400" placeholder="예: 어린 엄마랑 손을 잡고 학교 운동장을 걷고 싶어요."></textarea>
+  </label>
+  <p class="status">과거 사진에 여러 사람이 있다면 <b>만날 사람 한 명을 사진에서 분명하게 지정</b>해 주세요. 사람을 구별하기 어려운 경우에는 임의로 얼굴을 만들어서는 안 됩니다.</p>
+ </div>
+ <div class="family-summary" id="timeSummary" role="status"></div>
+ <p class="status">모든 시간여행은 상상 속 창작사진입니다. 실제 가족의 원본 얼굴을 최대한 보존하고 미화하지 않으며, AI가 만든 새 얼굴을 원본으로 삼지 않습니다.</p>
 </section>
 <div class="lab-card" id="magicScenePanel"><h2 class="kid-step">② 어디로 떠나볼까요?</h2><p>그림을 보고 마음에 드는 장면을 눌러 주세요.</p><div class="scene-buttons" id="scenes"></div><p id="sceneDesc" class="secondary"></p><div class="lab-meta" style="margin:14px 0" id="creativeControls"><h2 class="choice-heading">③ 내가 직접 꾸미기</h2><p class="status">표정 · 자세 · 옷은 출발 모습만 정합니다. 세부 아이디어와 수정은 GPT 창작방에서 아이가 말로 이어가면 됩니다.</p><div class="creative-grid"><label>😊 표정<select id="expressionChoice" class="lab-select"><option value="">장면 기본 표정</option><option value="환하게 웃는 표정">환하게 웃기</option><option value="수줍고 부드러운 미소">수줍게 웃기</option><option value="눈을 반짝이며 놀라는 표정">신기해하기</option><option value="호기심 가득한 표정">호기심 표현</option><option value="차분하고 자연스러운 미소">차분하게 미소</option></select></label><label>🧍 자세<select id="poseChoice" class="lab-select"><option value="">장면 기본 자세</option><option value="편안히 앉아 양손이 자연스럽게 보이는 자세">앉기</option><option value="똑바로 서서 양팔을 자연스럽게 내린 자세">서 있기</option><option value="두 팔을 자연스럽게 움직이며 달리는 자세">달리기</option><option value="한 손으로 인사하고 다른 손은 자연스럽게 내린 자세">손 흔들기</option><option value="꽃을 한 손에 들고 다른 손은 무릎에 둔 자세">꽃 들기</option></select></label><label>👗 의상<select id="clothesChoice" class="lab-select"><option value="">장면 기본 의상</option><option value="원본 사진의 옷을 최대한 유지">원본 의상 유지</option><option value="자연스러운 꽃무늬 원피스">꽃무늬 원피스</option><option value="동화풍 파스텔 의상">동화풍 의상</option><option value="편안한 여행복">여행복</option><option value="얼굴이 드러나는 사실적인 우주복">우주복</option></select></label></div><button id="resetChoices" type="button" class="button">↺ 장면 기본값으로 되돌리기</button><details class="advanced"><summary>⭐ 저장해 둔 마법 조합 사용하기</summary><div class="lab-meta" style="margin-top:8px;background:#fff"><h3 style="margin:0">나만의 마법 조합</h3><p class="status">선택한 장면·표정·자세·의상을 이름 붙여 저장하고 다시 불러올 수 있습니다. 기존 작품 사진은 바뀌지 않습니다.</p><label>조합 이름<input id="presetName" class="lab-select" maxlength="40" placeholder="예: 꽃밭의 공주님"></label><label>저장한 조합<select id="presetList" class="lab-select"><option value="">저장한 조합 선택</option></select></label><div class="lab-actions"><button id="savePreset" type="button" class="button strong">⭐ 새 조합 저장</button><button id="loadPreset" type="button" class="button">↩ 조합 불러오기</button><button id="deletePreset" type="button" class="button">조합 삭제</button></div><p id="presetStatus" class="status" role="status">저장한 조합이 아직 없습니다.</p></div></details></div><section class="talk-studio hidden" id="talkStudio" aria-hidden="true"><h2>🎤 ④ 이야기하며 꾸미기</h2><p class="talk-lead">하고 싶은 말을 자유롭게 해보세요. 말이 길어도 앱이 보기 좋게 정리해요.</p><div class="talk-controls"><button type="button" class="talk-big" id="talkStart">🎤 말하기</button><button type="button" class="talk-other" id="talkSpeak">🔊 앱 이야기 듣기</button></div><p id="talkStatus" class="status" role="status">말하기가 지원되지 않으면 아래 칸을 누르고 iPad 키보드의 🎤 받아쓰기를 사용하세요.</p><label class="talk-input-label" for="talkInput">내가 하고 싶은 말</label><textarea id="talkInput" class="talk-input" rows="2" placeholder="예: 두 갈래 머리에 공주옷을 입고 토끼랑 뛰고 싶어!"></textarea><div class="talk-controls"><button type="button" class="button strong" id="talkArrange">✨ 내 말 정리하기</button><button type="button" class="button" id="talkReset">↺ 이야기 다시 시작</button></div><div id="talkSummary" class="talk-summary" aria-live="polite"><b>나의 창작 이야기</b><p>말하거나 입력한 뒤 「내 말 정리하기」를 눌러 주세요.</p></div><div id="talkQuestion" class="talk-question hidden" aria-live="polite"></div><div class="talk-controls"><button type="button" class="button strong hidden" id="talkApprove">👍 이대로 만들기</button><button type="button" class="button hidden" id="talkRemoveLast">↩ 마지막 요청 취소</button></div><p class="status">이 기능은 기기 안에서 미리 정한 표현들을 정리합니다. 어려운 표현은 직접 확인해야 하며, GPT가 자동으로 답을 주는 기능은 아닙니다.</p></section><details class="advanced"><summary>⚙️ 부모용 · 요청문 확인 및 추가</summary><h3>앱이 만든 기본 요청문</h3><p class="status">아이의 장면·표정·자세·의상 조건입니다. 이 내용은 실수로 지워지지 않도록 보호됩니다.</p><textarea class="prompt" id="prompt" readonly aria-label="앱이 만든 기본 요청문"></textarea><label style="display:grid;gap:7px;font-weight:800;margin-top:12px">➕ 부모 추가 요청<textarea id="parentExtra" class="talk-input" rows="3" maxlength="1200" placeholder="예: 얼굴은 원본과 최대한 비슷하게 유지하고, 배경은 조금 덜 복잡하게 해주세요."></textarea></label><p class="status">필요한 내용만 추가하세요. 기본 요청문과 아이가 말한 내용 뒤에 자동으로 합쳐집니다.</p><h3>GPT에 보낼 최종 요청문</h3><textarea class="prompt" id="finalPrompt" readonly aria-label="GPT에 보낼 최종 요청문"></textarea><div class="lab-actions"><button class="button strong" id="copyPrompt">📋 최종 요청문 복사</button><button class="button" id="openChatParent" type="button">💬 GPT 창작방 열기 · 처음 1회</button></div><p class="warning">이 웹앱 자체는 사진을 자동 전송하지 않습니다. ChatGPT에서 사진을 첨부하는 순간 외부 AI 서비스에서 처리될 수 있으므로 보호자의 판단 아래 이용해 주세요.</p></details></div>
 <div class="lab-card"><h2 class="kid-step">⑤ 완성사진 가져오기</h2><p>ChatGPT에서 <b>이미지만 → 다운로드</b>한 뒤 돌아와서 방금 받은 사진을 골라 주세요. 사진 앱에 먼저 옮기지 않아도 됩니다. 파일을 선택할 때 다운로드 폴더나 사진 보관함을 고를 수 있습니다.</p><label for="resultFile" class="button strong result-pick" style="display:block;text-align:center;box-sizing:border-box">🖼 완성사진 가져오기</label><input id="resultFile" type="file" accept="image/*,.heic,.heif" hidden><div class="lab-grid" style="margin-top:12px"><div><h3>원본 사진</h3><div class="photo-box" id="originalView"><span>원본 사진을 선택해 주세요</span></div></div><div><h3>AI 창작 결과</h3><div class="photo-box" id="resultView"><span>AI 결과 사진을 선택해 주세요</span></div></div></div><section id="reviewPanel" class="review-panel" hidden aria-label="아이 작품 평가와 수정 도우미">
@@ -157,4 +251,4 @@
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">📚 안전한 분할 백업</h3><div class="creative-grid"><label>한 묶음 작품 수<select id="splitSize" class="lab-select"><option value="3">3장씩</option><option value="5">5장씩</option></select></label><div style="display:flex;align-items:end"><button class="button" id="backupSplit" type="button" style="width:100%">📦 다음 묶음 백업</button></div></div><p id="splitStatus" class="status">첫 묶음부터 시작합니다. 한 번 누를 때 파일 하나만 만들어 iPad의 메모리 부담을 줄입니다.</p></div>
 <div class="lab-meta" style="margin-top:12px"><h3 style="margin:0">💾 저장 상태</h3><p id="storageStatus" class="status">브라우저 저장 상태를 확인 중입니다.</p><div class="lab-actions"><button class="button" id="checkStorage" type="button">저장 상태 다시 확인</button></div></div>
 <p class="status">완성작 장기 보관은 사진 앱을 권장합니다. 전체 백업은 메모리 안전 기준을 넘으면 자동 중단하며, 개별·분할 백업이 더 안전합니다.</p>
-</details></div></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C2_4_5_first_quality"></script></body></html>
+</details></div></div></div><div id="returnHelper" class="return-helper hidden"><button id="returnImport" class="button strong return-import" type="button">🖼 완성사진 가져오기</button><button id="returnClose" class="return-close" type="button" aria-label="가져오기 안내 닫기">×</button></div><script src="ai-lab.js?v=C2_5_1_meet_past"></script></body></html>
