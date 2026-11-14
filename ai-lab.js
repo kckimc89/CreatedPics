@@ -73,6 +73,8 @@ function setTimeSubmode(mode){
  $('timeMeetMode').setAttribute('aria-pressed',String(meet));
  $('timeTravelFields').classList.toggle('hidden',meet);
  $('timeMeetFields').classList.toggle('hidden',!meet);
+ sharedUpdateVisibility();
+ if(meet&&source)sharedRefreshBase();
  if(creativeMode==='time'){
   $('sourceHeading').textContent=meet?'① 바탕이 될 과거 가족사진 고르기':'① 시간여행할 실제 사진 고르기';
   $('sourceHelp').textContent=meet?'옛 사진의 사람·배경·구도를 그대로 보존합니다. 현재 아이 사진은 아래에서 추가하세요.':'시간여행할 실제 원본사진을 한 장 골라 주세요.';
@@ -160,6 +162,7 @@ function setFamilySubmode(mode){
  $('familyAddMode').setAttribute('aria-pressed',String(!play));
  $('familyPlayMode').setAttribute('aria-pressed',String(play));
  document.querySelectorAll('.family-play-only').forEach(el=>el.classList.toggle('hidden',!play));
+ sharedUpdateVisibility();
  $('familyModeHelp').textContent=play?'함께할 가족과 행동을 고르세요. 기존 가족의 얼굴과 여행 배경은 최대한 유지합니다.':'기존 가족과 여행 배경을 유지하면서 아이 한 명만 자연스럽게 추가합니다.';
  if(creativeMode==='family')$('workTitle').value=play?'가족과 함께 놀기':'가족여행에 아이 추가하기';
  updateFamilySummary();
@@ -184,6 +187,7 @@ function setCreativeMode(mode){
   $(id).setAttribute('aria-pressed',String(creativeMode===name));
  }
  $('familyPanel').classList.toggle('hidden',creativeMode!=='family');
+ sharedUpdateVisibility();
  $('timePanel').classList.toggle('hidden',creativeMode!=='time');
  $('magicScenePanel').classList.toggle('hidden',creativeMode!=='magic');
  const heads={family:'① 가족여행 사진 고르기',time:timeSubmode==='meet'?'① 바탕이 될 과거 가족사진 고르기':'① 시간여행할 실제 사진 고르기',magic:'① 사진 한 장 고르기'};
@@ -380,7 +384,7 @@ function markSelection(){
   });
 }
 async function normalize(file){if(!file||!file.type.startsWith('image/'))throw Error('JPG, PNG, WebP 등 이미지 파일을 선택해 주세요.');const url=URL.createObjectURL(file);try{const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('사진을 읽지 못했습니다. HEIC는 사진 앱에서 JPEG로 내보낸 뒤 다시 선택해 주세요.'));i.src=url;});const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.90);}finally{URL.revokeObjectURL(url);}}
-$('originalFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
+$('originalFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);newDraft({preserveSource:false});storyItems=[];storyConfirmed=false;pendingChoice=null;renderStory();$('talkQuestion').classList.add('hidden');$('talkApprove').classList.add('hidden');compareBeforeId='';compareBeforeData=null;compareAfterData=null;updateChildCompare();source=data;view('originalView',source);if(sharedVisible())sharedRefreshBase();$('sourceStatus').textContent='✅ 원본을 화면에 불러왔습니다. 외부로 전송하지 않았습니다.';message('새 원본을 선택했습니다. 새 AI 결과를 가져와 주세요.');}catch(err){$('sourceStatus').textContent='⚠️ '+err.message;}};
 $('resultFile').onchange=async e=>{hideChildCompare();const f=e.target.files?.[0];e.target.value='';if(!f)return;try{const data=await normalize(f);if(editMode){ // keep selected work untouched; explicitly move to a new creation
     const parent=repairParent||compareBeforeId;newDraft({preserveSource:true,preserveParent:!!parent});repairParent=parent;compareBeforeId=parent;
   }
@@ -802,7 +806,7 @@ $('timePresentFile').onchange=async e=>{
  const f=e.target.files?.[0];e.target.value='';if(!f)return;
  try{
   const img=await normalize(f);
-  timePresentPhoto=img;
+  timePresentPhoto=img;sharedRefreshChild();
   const node=document.createElement('img');
   node.src=img;node.alt='추가할 현재 아이 사진 미리보기';
   $('timePresentPreview').replaceChildren(node);
@@ -817,16 +821,185 @@ $('familyAddMode').onclick=()=>setFamilySubmode('add');
 $('familyPlayMode').onclick=()=>setFamilySubmode('play');
 $('familyChildFile').onchange=async e=>{
  const f=e.target.files?.[0];e.target.value='';if(!f)return;
- try{const img=await normalize(f);familyChild=img;const node=document.createElement('img');node.src=img;node.alt='추가할 아이 사진 미리보기';$('familyChildPreview').replaceChildren(node);$('familyChildStatus').textContent='✅ 아이 사진을 불러왔습니다. GPT에서는 가족여행 사진과 이 사진 두 장을 직접 첨부해 주세요.';updateFamilySummary();}
+ try{const img=await normalize(f);familyChild=img;sharedRefreshChild();const node=document.createElement('img');node.src=img;node.alt='추가할 아이 사진 미리보기';$('familyChildPreview').replaceChildren(node);$('familyChildStatus').textContent='✅ 아이 사진을 불러왔습니다. GPT에서는 가족여행 사진과 이 사진 두 장을 직접 첨부해 주세요.';updateFamilySummary();}
  catch(err){$('familyChildStatus').textContent='⚠️ '+err.message;}
 };
 familyIds.forEach(id=>$(id).addEventListener(id==='familyExtra'?'input':'change',updateFamilySummary));
 // Avoid reusing a previously chosen child photo when choosing a new family source.
 $('originalFile').addEventListener('change',()=>{
- if(creativeMode==='family'){familyChild=null;$('familyChildPreview').textContent='추가할 아이 사진을 골라 주세요';$('familyChildStatus').textContent='새 여행사진을 선택했으므로 아이 사진도 다시 골라 주세요.';updateFamilySummary();}
- if(creativeMode==='time'&&timeSubmode==='meet'){timePresentPhoto=null;$('timePresentPreview').textContent='현재의 아이 사진을 다시 골라 주세요';$('timePresentStatus').textContent='새 과거 원본을 선택했으므로 추가할 현재 아이 사진을 다시 골라 주세요.';updateTimeMeetSummary();}
+ if(creativeMode==='family'){sharedResetChild();familyChild=null;$('familyChildPreview').textContent='추가할 아이 사진을 골라 주세요';$('familyChildStatus').textContent='새 여행사진을 선택했으므로 아이 사진도 다시 골라 주세요.';updateFamilySummary();}
+ if(creativeMode==='time'&&timeSubmode==='meet'){sharedResetChild();timePresentPhoto=null;$('timePresentPreview').textContent='현재의 아이 사진을 다시 골라 주세요';$('timePresentStatus').textContent='새 과거 원본을 선택했으므로 추가할 현재 아이 사진을 다시 골라 주세요.';updateTimeMeetSummary();}
 });
 updateFamilySummary();
 updateTimeSummary();
+
+
+
+// C2.5.4: one shared editor for family add and time-meet. Changes never write to the original/source record.
+let sharedMethod='gpt',sharedPrepareMethod='manual',sharedBase=null,sharedReference=null,sharedCutout=null;
+let sharedPoints=[],sharedCenterX=.65,sharedCenterY=.6,sharedScale=.28,sharedDragging=null,sharedLoadSeq=0,sharedReferenceKey=null,sharedReferenceSeq=0;
+const sharedCanvas=$('sharedCompositeCanvas'), sharedCanvasCtx=sharedCanvas.getContext('2d');
+const sharedOutline=$('sharedOutlineCanvas'),sharedOutlineCtx=sharedOutline.getContext('2d');
+function sharedVisible(){return creativeMode==='family'||(creativeMode==='time'&&timeSubmode==='meet');}
+function sharedUpdateVisibility(){
+ const visible=sharedVisible();$('sharedCompositePanel').classList.toggle('hidden',!visible);
+ $('sharedCompositeDescription').textContent=creativeMode==='family'
+ ? '가족여행: 첫 번째 원본 가족사진을 보호하고 두 번째 아이를 추가합니다. 「함께 놀기」는 GPT에서 손잡기 등을 표현할 수 있으나 원본 고정 합성은 자세를 변경하지 않습니다.'
+ : '타임머신: 첫 번째 과거 사진의 사람·배경·구도를 보호하고 두 번째 현재 아이를 추가합니다. 과거의 아이를 현재로 옮기지 않습니다.';
+ if(visible){sharedRefreshBase();sharedRefreshChild();}
+}
+function sharedSetMethod(method){
+ sharedMethod=method==='locked'?'locked':'gpt';
+ $('sharedGptMode').classList.toggle('active',sharedMethod==='gpt');
+ $('sharedLockedMode').classList.toggle('active',sharedMethod==='locked');
+ $('sharedGptMode').setAttribute('aria-pressed',String(sharedMethod==='gpt'));
+ $('sharedLockedMode').setAttribute('aria-pressed',String(sharedMethod==='locked'));
+ $('sharedGptInfo').classList.toggle('hidden',sharedMethod!=='gpt');
+ $('sharedLockedEditor').classList.toggle('hidden',sharedMethod!=='locked');
+ if(sharedMethod==='locked'){sharedRefreshBase();sharedRefreshChild();}
+}
+function sharedSetPreparation(method){
+ sharedPrepareMethod=method==='transparent'?'transparent':'manual';
+ $('sharedManualMode').classList.toggle('active',sharedPrepareMethod==='manual');
+ $('sharedTransparentMode').classList.toggle('active',sharedPrepareMethod==='transparent');
+ $('sharedManualMode').setAttribute('aria-pressed',String(sharedPrepareMethod==='manual'));
+ $('sharedTransparentMode').setAttribute('aria-pressed',String(sharedPrepareMethod==='transparent'));
+ $('sharedManualEditor').classList.toggle('hidden',sharedPrepareMethod!=='manual');
+ $('sharedTransparentEditor').classList.toggle('hidden',sharedPrepareMethod!=='transparent');
+}
+function sharedStatus(message){$('sharedCompositeStatus').textContent=message;}
+function sharedImage(url){return new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('사진을 읽지 못했습니다.'));im.src=url;});}
+async function sharedRefreshBase(){
+ const seq=++sharedLoadSeq,old=source;
+ if(!old){sharedBase=null;sharedDraw();return;}
+ try{const im=await sharedImage(old);if(seq===sharedLoadSeq){sharedBase=im;sharedDraw();}}
+ catch(_){if(seq===sharedLoadSeq){sharedBase=null;sharedDraw();sharedStatus('기준 사진을 읽지 못했습니다.');}}
+}
+function sharedResetChild(){
+ sharedReferenceKey=null;sharedReferenceSeq++;sharedReference=null;sharedCutout=null;sharedPoints=[];sharedDrawOutline();sharedDraw();
+ sharedStatus('현재 아이 사진을 다시 선택해 주세요.');
+}
+async function sharedRefreshChild(){
+ const photo=creativeMode==='family'?familyChild:creativeMode==='time'&&timeSubmode==='meet'?timePresentPhoto:null;
+ if(!photo){sharedReferenceKey=null;sharedReferenceSeq++;sharedReference=null;sharedCutout=null;sharedPoints=[];sharedDrawOutline();sharedDraw();return;}
+ if(sharedReferenceKey===photo && sharedReference)return;
+ const seq=++sharedReferenceSeq;
+ try{const image=await sharedImage(photo);if(seq!==sharedReferenceSeq)return;sharedReferenceKey=photo;
+  // Never reuse a cutout generated from a different reference or mode.
+  sharedReference=image;sharedCutout=null;sharedPoints=[];sharedDrawOutline();sharedDraw();
+  sharedStatus('사진 준비됨. 원본 고정 합성을 선택한 뒤 아이의 윤곽을 지정하거나 투명 사진을 골라 주세요.');
+ }catch(_){sharedStatus('아이 사진을 읽지 못했습니다.');}
+}
+function sharedDrawOutline(){
+ const im=sharedReference;
+ if(!im){sharedOutline.width=1;sharedOutline.height=1;sharedOutlineCtx.clearRect(0,0,1,1);return;}
+ const ratio=Math.min(1,1100/Math.max(im.naturalWidth,im.naturalHeight));
+ sharedOutline.width=Math.max(1,Math.round(im.naturalWidth*ratio));
+ sharedOutline.height=Math.max(1,Math.round(im.naturalHeight*ratio));
+ sharedOutlineCtx.drawImage(im,0,0,sharedOutline.width,sharedOutline.height);
+ if(sharedPoints.length){
+  sharedOutlineCtx.lineWidth=Math.max(2,sharedOutline.width/350);
+  sharedOutlineCtx.strokeStyle='#e6007e';sharedOutlineCtx.fillStyle='#e6007e';
+  sharedOutlineCtx.beginPath();sharedPoints.forEach(([x,y],idx)=>idx?sharedOutlineCtx.lineTo(x,y):sharedOutlineCtx.moveTo(x,y));
+  sharedOutlineCtx.stroke();
+  for(const [x,y] of sharedPoints){sharedOutlineCtx.beginPath();sharedOutlineCtx.arc(x,y,Math.max(3,sharedOutline.width/230),0,Math.PI*2);sharedOutlineCtx.fill();}
+ }
+}
+function sharedPosition(){
+ if(!sharedBase||!sharedCutout)return null;
+ const w=sharedBase.naturalWidth*sharedScale,h=w*sharedCutout.naturalHeight/sharedCutout.naturalWidth;
+ return {x:sharedBase.naturalWidth*sharedCenterX-w/2,y:sharedBase.naturalHeight*sharedCenterY-h/2,w,h};
+}
+function sharedDraw(){
+ if(!sharedBase){sharedCanvas.width=1;sharedCanvas.height=1;sharedCanvasCtx.clearRect(0,0,1,1);return;}
+ sharedCanvas.width=sharedBase.naturalWidth;sharedCanvas.height=sharedBase.naturalHeight;
+ sharedCanvasCtx.drawImage(sharedBase,0,0);
+ const p=sharedPosition();if(p)sharedCanvasCtx.drawImage(sharedCutout,p.x,p.y,p.w,p.h);
+}
+function sharedResetPosition(){sharedCenterX=.65;sharedCenterY=.6;sharedScale=.28;$('sharedChildSize').value='28';sharedDraw();}
+$('sharedGptMode').onclick=()=>sharedSetMethod('gpt');
+$('sharedLockedMode').onclick=()=>sharedSetMethod('locked');
+$('sharedManualMode').onclick=()=>sharedSetPreparation('manual');
+$('sharedTransparentMode').onclick=()=>sharedSetPreparation('transparent');
+sharedOutline.addEventListener('pointerup',e=>{
+ if(!sharedReference)return;
+ const rect=sharedOutline.getBoundingClientRect();if(rect.width<=0||rect.height<=0)return;
+ const x=Math.min(sharedOutline.width,Math.max(0,(e.clientX-rect.left)/rect.width*sharedOutline.width));
+ const y=Math.min(sharedOutline.height,Math.max(0,(e.clientY-rect.top)/rect.height*sharedOutline.height));
+ sharedPoints.push([x,y]);sharedDrawOutline();
+ $('sharedOutlineStatus').textContent=sharedPoints.length+'개 점 선택. 아이 외곽선을 따라 계속 터치하고 「윤곽 완성」을 누르세요.';
+});
+$('sharedUndoPoint').onclick=()=>{sharedPoints.pop();sharedDrawOutline();};
+$('sharedResetOutline').onclick=()=>{sharedPoints=[];sharedCutout=null;sharedDrawOutline();sharedDraw();$('sharedOutlineStatus').textContent='처음부터 아이의 바깥 윤곽을 따라 점을 찍어 주세요.';};
+$('sharedFinishOutline').onclick=async()=>{
+ if(!sharedReference||sharedPoints.length<3){$('sharedOutlineStatus').textContent='⚠️ 아이를 선택하고 윤곽 점을 적어도 3개 찍어 주세요.';return;}
+ const im=sharedReference;const sx=im.naturalWidth/sharedOutline.width,sy=im.naturalHeight/sharedOutline.height;
+ const bounds={minx:Math.max(0,Math.floor(Math.min(...sharedPoints.map(p=>p[0]))*sx)),maxx:Math.min(im.naturalWidth,Math.ceil(Math.max(...sharedPoints.map(p=>p[0]))*sx)),miny:Math.max(0,Math.floor(Math.min(...sharedPoints.map(p=>p[1]))*sy)),maxy:Math.min(im.naturalHeight,Math.ceil(Math.max(...sharedPoints.map(p=>p[1]))*sy))};
+ if(bounds.maxx-bounds.minx<8||bounds.maxy-bounds.miny<8){$('sharedOutlineStatus').textContent='⚠️ 윤곽의 폭과 높이가 너무 작습니다.';return;}
+ const c=document.createElement('canvas');c.width=bounds.maxx-bounds.minx;c.height=bounds.maxy-bounds.miny;
+ const ctx=c.getContext('2d');ctx.save();ctx.beginPath();
+ sharedPoints.forEach(([x,y],i)=>i?ctx.lineTo(x*sx-bounds.minx,y*sy-bounds.miny):ctx.moveTo(x*sx-bounds.minx,y*sy-bounds.miny));
+ ctx.closePath();ctx.clip();ctx.drawImage(im,-bounds.minx,-bounds.miny);ctx.restore();
+ try{sharedCutout=await sharedImage(c.toDataURL('image/png'));sharedResetPosition();sharedStatus('✅ 현재 아이의 윤곽만 남겼습니다. 과거/가족 원본은 그대로 둔 채 아래 사진에서 크기와 위치를 조절하세요.');}
+ catch(_){sharedStatus('⚠️ 윤곽 합성에 실패했습니다.');}
+};
+async function sharedAlphaCheck(im){
+ const c=document.createElement('canvas');c.width=Math.min(im.naturalWidth,150);c.height=Math.min(im.naturalHeight,150);
+ const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(im,0,0,c.width,c.height);
+ const a=ctx.getImageData(0,0,c.width,c.height).data;
+ let zeros=0;for(let i=3;i<a.length;i+=4)if(a[i]<245)zeros++;
+ return zeros>(a.length/4)*.01;
+}
+$('sharedCutoutFile').onchange=async e=>{
+ const f=e.target.files?.[0];e.target.value='';if(!f)return;
+ if(!['image/png','image/webp'].includes(f.type)){sharedStatus('⚠️ PNG 또는 WebP 파일만 선택해 주세요.');return;}
+ try{const data=await new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=()=>reject(Error('읽기 실패'));fr.readAsDataURL(f);});
+  const im=await sharedImage(data);if(!await sharedAlphaCheck(im)){sharedStatus('⚠️ 배경이 투명하지 않습니다. 「윤곽 직접 따기」를 선택하세요.');return;}
+  sharedCutout=im;sharedResetPosition();sharedStatus('✅ 투명한 아이 사진이 준비되었습니다. 기존 사진에 배치해 주세요.');
+ }catch(err){sharedStatus('⚠️ '+err.message);}
+};
+$('sharedChildSize').oninput=e=>{sharedScale=Number(e.target.value)/100;sharedDraw();};
+$('sharedResetPlacement').onclick=sharedResetPosition;
+sharedCanvas.addEventListener('pointerdown',e=>{
+ const p=sharedPosition();if(!p)return;
+ const rect=sharedCanvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
+ const x=(e.clientX-rect.left)/rect.width*sharedCanvas.width,y=(e.clientY-rect.top)/rect.height*sharedCanvas.height;
+ if(x<p.x||x>p.x+p.w||y<p.y||y>p.y+p.h)return;
+ sharedDragging={id:e.pointerId,x,y,oldX:sharedCenterX,oldY:sharedCenterY};sharedCanvas.setPointerCapture(e.pointerId);
+});
+sharedCanvas.addEventListener('pointermove',e=>{
+ if(!sharedDragging||sharedDragging.id!==e.pointerId)return;
+ const rect=sharedCanvas.getBoundingClientRect();if(!rect.width||!rect.height)return;
+ const x=(e.clientX-rect.left)/rect.width*sharedCanvas.width,y=(e.clientY-rect.top)/rect.height*sharedCanvas.height;
+ sharedCenterX=Math.max(0,Math.min(1,sharedDragging.oldX+(x-sharedDragging.x)/sharedCanvas.width));
+ sharedCenterY=Math.max(0,Math.min(1,sharedDragging.oldY+(y-sharedDragging.y)/sharedCanvas.height));sharedDraw();
+});
+for(const event of ['pointerup','pointercancel','lostpointercapture'])sharedCanvas.addEventListener(event,()=>sharedDragging=null);
+function sharedReady(){
+ if(!source||!sharedBase){sharedStatus('⚠️ ①에서 기준 가족사진을 먼저 골라 주세요.');return false;}
+ if(!sharedCutout){sharedStatus('⚠️ 현재 아이의 윤곽을 완성하거나 투명 사진을 골라 주세요.');return false;}
+ return true;
+}
+$('sharedImportResult').onclick=()=>{
+ if(!sharedReady())return;
+ // Import result into the existing fifth step without overwriting an earlier saved piece.
+ if(editMode){newDraft({preserveSource:true});}
+ sharedDraw();result=sharedCanvas.toDataURL('image/png');compareBeforeData=result;compareAfterData=null;
+ view('resultView',result);resetReviewGuide(true);markSelection();updateChildCompare();
+ $('resultScene').value=creativeMode==='family'?'family':'time';
+ sharedStatus('✅ 합성사진을 ⑤ 완성사진으로 보냈습니다. 아래에서 별도 새 작품으로 저장할 수 있습니다.');
+ $('resultView').scrollIntoView({behavior:'smooth',block:'center'});
+};
+$('sharedExport').onclick=()=>{
+ if(!sharedReady())return;sharedDraw();
+ sharedCanvas.toBlob(blob=>{
+  if(!blob){sharedStatus('⚠️ PNG 저장에 실패했습니다.');return;}
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
+  a.download=creativeMode==='family'?'가족여행_원본보호_아이추가.png':'시간여행_원본보호_아이추가.png';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);
+  sharedStatus('✅ 기존 원본을 바꾸지 않고 별도 PNG 파일을 저장했습니다.');
+ },'image/png');
+};
+sharedSetMethod('gpt');sharedSetPreparation('manual');sharedUpdateVisibility();
 
 })();
